@@ -1,0 +1,50 @@
+use anyhow::Result;
+use axum::{extract::State, http::StatusCode, response::Json, routing::get, Router};
+use serde_json::{json, Value};
+use std::sync::Arc;
+use tokio::net::TcpListener;
+
+use crate::ArkClient;
+
+#[derive(Clone)]
+pub struct AppState {
+    pub ark_client: Arc<ArkClient>,
+}
+
+pub async fn start_server(ark_client: ArkClient, port: u16) -> Result<()> {
+    let state = AppState {
+        ark_client: Arc::new(ark_client),
+    };
+
+    let app = Router::new()
+        .route("/address", get(get_address))
+        .route("/boarding-address", get(get_boarding_address))
+        .with_state(state);
+
+    let addr = format!("0.0.0.0:{}", port);
+    let listener = TcpListener::bind(&addr).await?;
+    
+    println!("🚀 Server starting on http://{}", addr);
+    println!("📍 Address endpoint: http://{}/address", addr);
+    println!("🚢 Boarding address endpoint: http://{}/boarding-address", addr);
+
+    axum::serve(listener, app).await?;
+
+    Ok(())
+}
+
+async fn get_address(State(state): State<AppState>) -> Result<Json<Value>, StatusCode> {
+    let address = state.ark_client.get_address();
+    
+    Ok(Json(json!({
+        "address": address.to_string()
+    })))
+}
+
+async fn get_boarding_address(State(state): State<AppState>) -> Result<Json<Value>, StatusCode> {
+    let boarding_address = state.ark_client.get_boarding_address();
+    
+    Ok(Json(json!({
+        "boarding_address": boarding_address.to_string()
+    })))
+}

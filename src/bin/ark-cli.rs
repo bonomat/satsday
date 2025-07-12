@@ -17,7 +17,10 @@ struct Cli {
 
 #[derive(clap::Subcommand)]
 enum Commands {
-    Start,
+    Start {
+        #[arg(short, long, default_value = "3000")]
+        port: u16,
+    },
     Balance,
     Address,
     BoardingAddress,
@@ -43,13 +46,15 @@ async fn main() -> Result<()> {
     let client = ArkClient::new(config, secret_key).await?;
 
     match cli.command {
-        Commands::Start => {
-            println!("ARK client started successfully!");
-            println!("Offchain address: {}", client.get_address());
-            println!("Boarding address: {}", client.get_boarding_address());
+        Commands::Start { port } => {
+            println!("🎲 Starting Satoshi Dice server...");
+            println!("📍 Offchain address: {}", client.get_address());
+            println!("🚢 Boarding address: {}", client.get_boarding_address());
 
             let balance = client.get_balance().await?;
-            println!("Balance: {:?}", balance);
+            println!("💰 Balance: {:?}", balance);
+            
+            satoshi_dice::server::start_server(client, port).await?;
         }
         Commands::Balance => {
             let balance = client.get_balance().await?;
