@@ -1,0 +1,36 @@
+[package]
+name = "satoshi_dice"
+version = "0.1.0"
+edition = "2024"
+
+[[bin]]
+name = "satoshi_dice"
+path = "src/bin/ark-cli.rs"
+
+[dependencies]
+anyhow = "1"
+ark-bdk-wallet = { path = "../../ark-network/ark-rs/ark-bdk-wallet" }
+ark-core = { path = "../../ark-network/ark-rs/ark-core" }
+ark-grpc = { path = "../../ark-network/ark-rs/ark-grpc" }
+axum = "0.8"
+base64 = "0.22.1"
+bdk_esplora = "0.19.0"
+bdk_wallet = "1.0.0-beta.5"
+bitcoin = { version = "0.32.4", features = ["rand"] }
+clap = { version = "4", features = ["derive"] }
+esplora-client = { version = "0.10.0", features = ["async-https", "blocking-https"] }
+futures = "0.3"
+hex = "0.4.3"
+rand = "0.8.5"
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+sha2 = "0.10.8"
+time = { version = "0.3", features = ["macros", "serde", "serde-well-known"] }
+tokio = { version = "1.41.0", features = ["full"] }
+toml = "0.8"
+tracing = "0.1.37"
+tracing-subscriber = { version = "0.3", default-features = false, features = ["fmt", "ansi", "env-filter", "time", "tracing-log", "json"] }
+jiff = "0.1"
+
+[patch.crates-io]
+secp256k1-zkp = { git = "https://github.com/sanket1729/rust-secp256k1-zkp", rev = "60e631c24588a0c9e271badd61959294848c665d" }
