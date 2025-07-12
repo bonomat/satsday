@@ -306,7 +306,7 @@ impl ArkClient {
         Ok(txs)
     }
 
-    async fn spendable_vtxos(&self, select_recoverable_vtxos: bool) -> Result<HashMap<Vtxo, Vec<ark_core::server::VtxoOutPoint>>> {
+    pub async fn spendable_vtxos(&self, select_recoverable_vtxos: bool) -> Result<HashMap<Vtxo, Vec<ark_core::server::VtxoOutPoint>>> {
         let mut spendable_vtxos = HashMap::new();
         let vtxo_outpoints = self.grpc_client.list_vtxos(&self.vtxo.to_ark_address()).await?;
 

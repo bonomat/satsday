@@ -4,7 +4,7 @@ use serde_json::{json, Value};
 use std::sync::Arc;
 use tokio::net::TcpListener;
 
-use crate::ArkClient;
+use crate::{transaction_processor::spawn_transaction_monitor, ArkClient};
 
 #[derive(Clone)]
 pub struct AppState {
@@ -12,9 +12,15 @@ pub struct AppState {
 }
 
 pub async fn start_server(ark_client: ArkClient, port: u16) -> Result<()> {
+    let ark_client_arc = Arc::new(ark_client);
+    
     let state = AppState {
-        ark_client: Arc::new(ark_client),
+        ark_client: ark_client_arc.clone(),
     };
+
+    // Start transaction monitoring in background
+    spawn_transaction_monitor(ark_client_arc, 10).await; // Check every 10 seconds
+    println!("🔍 Transaction monitoring started (checking every 10 seconds)");
 
     let app = Router::new()
         .route("/address", get(get_address))
