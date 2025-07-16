@@ -1,20 +1,30 @@
-use anyhow::{bail, Context, Result};
+use anyhow::{Context, Result, bail};
+use ark_core::server::ChainedTxType;
 use ark_core::{
-    boarding_output::{list_boarding_outpoints, BoardingOutpoints},
+    ArkAddress, ArkTransaction, BoardingOutput, TxGraph, Vtxo,
+    boarding_output::{BoardingOutpoints, list_boarding_outpoints},
     coin_select::select_vtxos,
     proof_of_funds,
-    redeem::{build_offchain_transactions, sign_checkpoint_transaction, sign_offchain_virtual_transaction, OffchainTransactions, VtxoInput},
-    round::{create_and_sign_forfeit_txs, generate_nonce_tree, sign_round_psbt, sign_vtxo_tree, OnChainInput, VtxoInput as RoundVtxoInput},
+    redeem::{
+        OffchainTransactions, VtxoInput, build_offchain_transactions, sign_checkpoint_transaction,
+        sign_offchain_virtual_transaction,
+    },
+    round::{
+        OnChainInput, VtxoInput as RoundVtxoInput, create_and_sign_forfeit_txs,
+        generate_nonce_tree, sign_round_psbt, sign_vtxo_tree,
+    },
     server::{BatchTreeEventType, RoundStreamEvent},
-    vtxo::{list_virtual_tx_outpoints, VirtualTxOutpoints},
-    ArkAddress, ArkTransaction, BoardingOutput, TxGraph, Vtxo,
+    vtxo::{VirtualTxOutpoints, list_virtual_tx_outpoints},
 };
+use ark_grpc::VtxoChainResponse;
+use bdk_wallet::miniscript::ToPublicKey;
+use bitcoin::key::TweakedPublicKey;
 use bitcoin::{
-    hashes::{sha256, Hash},
+    Amount, OutPoint, TxOut, Txid, XOnlyPublicKey,
+    hashes::{Hash, sha256},
     hex::DisplayHex,
     key::{Keypair, Secp256k1},
-    secp256k1::{self, schnorr, PublicKey, SecretKey},
-    Amount, TxOut, Txid, XOnlyPublicKey,
+    secp256k1::{self, PublicKey, SecretKey, schnorr},
 };
 use futures::StreamExt;
 use rand::thread_rng;
@@ -93,25 +103,27 @@ impl ArkClient {
 
     pub async fn get_balance(&self) -> Result<Balance> {
         let runtime = tokio::runtime::Handle::current();
-        let find_outpoints_fn = |address: &bitcoin::Address| -> Result<Vec<ark_core::ExplorerUtxo>, ark_core::Error> {
-            block_in_place(|| {
-                runtime.block_on(async {
-                    let outpoints = self
-                        .esplora_client
-                        .find_outpoints(address)
-                        .await
-                        .map_err(ark_core::Error::ad_hoc)?;
-                    Ok(outpoints)
+        let find_outpoints_fn =
+            |address: &bitcoin::Address| -> Result<Vec<ark_core::ExplorerUtxo>, ark_core::Error> {
+                block_in_place(|| {
+                    runtime.block_on(async {
+                        let outpoints = self
+                            .esplora_client
+                            .find_outpoints(address)
+                            .await
+                            .map_err(ark_core::Error::ad_hoc)?;
+                        Ok(outpoints)
+                    })
                 })
-            })
-        };
+            };
 
         let virtual_tx_outpoints = {
             let spendable_vtxos = self.spendable_vtxos(false).await?;
             list_virtual_tx_outpoints(find_outpoints_fn, spendable_vtxos)?
         };
 
-        let boarding_outpoints = list_boarding_outpoints(find_outpoints_fn, &[self.boarding_output.clone()])?;
+        let boarding_outpoints =
+            list_boarding_outpoints(find_outpoints_fn, &[self.boarding_output.clone()])?;
 
         Ok(Balance {
             offchain_spendable: virtual_tx_outpoints.spendable_balance(),
@@ -124,18 +136,19 @@ impl ArkClient {
 
     pub async fn send(&self, address: &ArkAddress, amount: Amount) -> Result<Txid> {
         let runtime = tokio::runtime::Handle::current();
-        let find_outpoints_fn = |address: &bitcoin::Address| -> Result<Vec<ark_core::ExplorerUtxo>, ark_core::Error> {
-            block_in_place(|| {
-                runtime.block_on(async {
-                    let outpoints = self
-                        .esplora_client
-                        .find_outpoints(address)
-                        .await
-                        .map_err(ark_core::Error::ad_hoc)?;
-                    Ok(outpoints)
+        let find_outpoints_fn =
+            |address: &bitcoin::Address| -> Result<Vec<ark_core::ExplorerUtxo>, ark_core::Error> {
+                block_in_place(|| {
+                    runtime.block_on(async {
+                        let outpoints = self
+                            .esplora_client
+                            .find_outpoints(address)
+                            .await
+                            .map_err(ark_core::Error::ad_hoc)?;
+                        Ok(outpoints)
+                    })
                 })
-            })
-        };
+            };
 
         let virtual_tx_outpoints = {
             let spendable_vtxos = self.spendable_vtxos(false).await?;
@@ -236,27 +249,30 @@ impl ArkClient {
 
     pub async fn settle(&self) -> Result<Option<Txid>> {
         let runtime = tokio::runtime::Handle::current();
-        let find_outpoints_fn = |address: &bitcoin::Address| -> Result<Vec<ark_core::ExplorerUtxo>, ark_core::Error> {
-            block_in_place(|| {
-                runtime.block_on(async {
-                    let outpoints = self
-                        .esplora_client
-                        .find_outpoints(address)
-                        .await
-                        .map_err(ark_core::Error::ad_hoc)?;
-                    Ok(outpoints)
+        let find_outpoints_fn =
+            |address: &bitcoin::Address| -> Result<Vec<ark_core::ExplorerUtxo>, ark_core::Error> {
+                block_in_place(|| {
+                    runtime.block_on(async {
+                        let outpoints = self
+                            .esplora_client
+                            .find_outpoints(address)
+                            .await
+                            .map_err(ark_core::Error::ad_hoc)?;
+                        Ok(outpoints)
+                    })
                 })
-            })
-        };
+            };
 
         let virtual_tx_outpoints = {
             let spendable_vtxos = self.spendable_vtxos(true).await?;
             list_virtual_tx_outpoints(find_outpoints_fn, spendable_vtxos)?
         };
 
-        let boarding_outpoints = list_boarding_outpoints(find_outpoints_fn, &[self.boarding_output.clone()])?;
+        let boarding_outpoints =
+            list_boarding_outpoints(find_outpoints_fn, &[self.boarding_output.clone()])?;
 
-        self.settle_internal(virtual_tx_outpoints, boarding_outpoints).await
+        self.settle_internal(virtual_tx_outpoints, boarding_outpoints)
+            .await
     }
 
     pub async fn transaction_history(&self) -> Result<Vec<ArkTransaction>> {
@@ -291,7 +307,10 @@ impl ArkClient {
 
         let mut offchain_transactions = Vec::new();
         for vtxo in vtxos.iter() {
-            let txs = self.grpc_client.get_tx_history(&vtxo.to_ark_address()).await?;
+            let txs = self
+                .grpc_client
+                .get_tx_history(&vtxo.to_ark_address())
+                .await?;
 
             for tx in txs {
                 if !boarding_round_transactions.contains(&tx.txid()) {
@@ -306,9 +325,15 @@ impl ArkClient {
         Ok(txs)
     }
 
-    pub async fn spendable_vtxos(&self, select_recoverable_vtxos: bool) -> Result<HashMap<Vtxo, Vec<ark_core::server::VtxoOutPoint>>> {
+    pub async fn spendable_vtxos(
+        &self,
+        select_recoverable_vtxos: bool,
+    ) -> Result<HashMap<Vtxo, Vec<ark_core::server::VtxoOutPoint>>> {
         let mut spendable_vtxos = HashMap::new();
-        let vtxo_outpoints = self.grpc_client.list_vtxos(&self.vtxo.to_ark_address()).await?;
+        let vtxo_outpoints = self
+            .grpc_client
+            .list_vtxos(&self.vtxo.to_ark_address())
+            .await?;
 
         let spendable = if select_recoverable_vtxos {
             vtxo_outpoints.spendable_with_recoverable()
@@ -320,7 +345,11 @@ impl ArkClient {
         Ok(spendable_vtxos)
     }
 
-    async fn settle_internal(&self, vtxos: VirtualTxOutpoints, boarding_outputs: BoardingOutpoints) -> Result<Option<Txid>> {
+    async fn settle_internal(
+        &self,
+        vtxos: VirtualTxOutpoints,
+        boarding_outputs: BoardingOutpoints,
+    ) -> Result<Option<Txid>> {
         let mut rng = thread_rng();
 
         if vtxos.spendable.is_empty() && boarding_outputs.spendable.is_empty() {
@@ -348,24 +377,25 @@ impl ArkClient {
                 },
             );
 
-            let vtxo_inputs = vtxos
-                .spendable
-                .clone()
-                .into_iter()
-                .map(|(virtual_tx_outpoint, vtxo)| {
-                    proof_of_funds::Input::new(
-                        virtual_tx_outpoint.outpoint,
-                        vtxo.exit_delay(),
-                        TxOut {
-                            value: virtual_tx_outpoint.amount,
-                            script_pubkey: vtxo.script_pubkey(),
-                        },
-                        vtxo.tapscripts(),
-                        vtxo.owner_pk(),
-                        vtxo.exit_spend_info(),
-                        false,
-                    )
-                });
+            let vtxo_inputs =
+                vtxos
+                    .spendable
+                    .clone()
+                    .into_iter()
+                    .map(|(virtual_tx_outpoint, vtxo)| {
+                        proof_of_funds::Input::new(
+                            virtual_tx_outpoint.outpoint,
+                            vtxo.exit_delay(),
+                            TxOut {
+                                value: virtual_tx_outpoint.amount,
+                                script_pubkey: vtxo.script_pubkey(),
+                            },
+                            vtxo.tapscripts(),
+                            vtxo.owner_pk(),
+                            vtxo.exit_spend_info(),
+                            false,
+                        )
+                    });
 
             boarding_inputs.chain(vtxo_inputs).collect::<Vec<_>>()
         };
@@ -431,7 +461,9 @@ impl ArkClient {
             .iter()
             .any(|h| h == &hash)
         {
-            self.grpc_client.confirm_registration(intent_id.clone()).await?;
+            self.grpc_client
+                .confirm_registration(intent_id.clone())
+                .await?;
         } else {
             bail!(
                 "Did not find intent ID {} in round: {}",
@@ -597,5 +629,89 @@ impl ArkClient {
         };
 
         Ok(Some(round_finalized_event.commitment_txid))
+    }
+
+    pub async fn get_parent_vtxo(&self, out_point: OutPoint) -> Result<Option<ArkAddress>> {
+        let response = self
+            .grpc_client
+            .get_vtxo_chain(Some(out_point), None)
+            .await?;
+        let parent_virtual = response
+            .chains
+            .inner
+            .iter()
+            .find(|vtxo| vtxo.txid == out_point.txid);
+        if let None = parent_virtual {
+            tracing::warn!("Parent not found");
+            return Ok(None);
+        }
+        if let Some(parent_vtxo) = parent_virtual {
+            let parent_checkpoint = response
+                .chains
+                .inner
+                .iter()
+                .find(|vtxo| &vtxo.txid == parent_vtxo.spends.get(0).unwrap());
+
+            if let None = parent_checkpoint {
+                tracing::warn!("Parent of parent not found");
+                return Ok(None);
+            }
+            let parent_checkpoint = parent_checkpoint.unwrap();
+
+            let parent_input = response
+                .chains
+                .inner
+                .iter()
+                .find(|vtxo| &vtxo.txid == parent_checkpoint.spends.get(0).unwrap());
+
+            if let None = parent_input {
+                tracing::warn!("Parent of parent not found");
+                return Ok(None);
+            }
+
+            if let Some(vtxo) = parent_input {
+                tracing::debug!(?vtxo, "Parent of parent was found");
+
+                let response = self
+                    .grpc_client
+                    .get_virtual_txs(vec![vtxo.txid.to_string()], None)
+                    .await?;
+
+                let psbt = response.txs.get(0).unwrap();
+                let output = psbt.unsigned_tx.output.get(0).unwrap();
+                let server_x_only = self.server_info.pk.x_only_public_key();
+                let buf = &output.script_pubkey;
+                let ark_address =
+                    get_address_from_output(buf, server_x_only.0, self.server_info.network).await;
+
+                return Ok(ark_address);
+            }
+        }
+
+        Ok(None)
+    }
+}
+
+async fn get_address_from_output(
+    script: &bitcoin::ScriptBuf,
+    server_pk: XOnlyPublicKey,
+    network: bitcoin::Network,
+) -> Option<ArkAddress> {
+    let script = script.as_script();
+    let instruction = script.instructions();
+    let mut enumerate = instruction.enumerate();
+    let (_, res) = enumerate.nth(1).unwrap();
+    let instruction = res.unwrap();
+    match instruction {
+        bitcoin::script::Instruction::PushBytes(b) => {
+            let vtxo_tap_key = XOnlyPublicKey::from_slice(b.as_bytes()).unwrap();
+            let vtxo_tap_key = TweakedPublicKey::dangerous_assume_tweaked(vtxo_tap_key);
+            let address = ArkAddress::new(network, server_pk, vtxo_tap_key);
+            Some(address)
+        }
+        bitcoin::script::Instruction::Op(o) => {
+            tracing::debug!("Opcode {o}");
+            None
+        }
     }
 }
