@@ -636,6 +636,7 @@ impl ArkClient {
             .grpc_client
             .get_vtxo_chain(Some(out_point), None)
             .await?;
+        dbg!(&response);
         let parent_virtual = response
             .chains
             .inner
@@ -650,6 +651,7 @@ impl ArkClient {
                 .chains
                 .inner
                 .iter()
+                // FIXME: vout 0 might not be correct here
                 .find(|vtxo| &vtxo.txid == parent_vtxo.spends.get(0).unwrap());
 
             if let None = parent_checkpoint {
@@ -670,8 +672,6 @@ impl ArkClient {
             }
 
             if let Some(vtxo) = parent_input {
-                tracing::debug!(?vtxo, "Parent of parent was found");
-
                 let response = self
                     .grpc_client
                     .get_virtual_txs(vec![vtxo.txid.to_string()], None)

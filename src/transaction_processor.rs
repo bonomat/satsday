@@ -53,16 +53,20 @@ impl TransactionProcessor {
         outpoint: &VtxoOutPoint,
     ) -> Result<()> {
         debug!(
-            "Processing spendable outpoint: {} with amount: {}",
-            outpoint.outpoint, outpoint.amount
+            amount = ?outpoint.amount,
+            outpoint = ?outpoint.outpoint,
+            spent = ?outpoint.is_spent,
+            spent = ?outpoint.spent_by,
+            "Processing spendable outpoint"
         );
+        dbg!(&outpoint);
 
         let ark_address = self.ark_client.get_parent_vtxo(outpoint.outpoint).await?;
 
         if let Some(address) = ark_address {
             let address_string = address.encode();
             tracing::info!(address_string, "Found sender");
-            let amount = Amount::from_sat(1234);
+            let amount = Amount::from_sat(1000);
             let txid = self.ark_client.send(&address, amount).await?;
             tracing::info!(?amount, txid = txid.to_string(), "Sent back");
         } else {
