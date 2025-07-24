@@ -1,6 +1,6 @@
 {
   "db_name": "SQLite",
-  "query": "\n        SELECT id, nonce, created_at, expires_at\n        FROM nonces\n        WHERE nonce = ?\n        ",
+  "query": "\n        SELECT id, nonce, nonce_hash, created_at, expires_at\n        FROM nonces\n        WHERE nonce = ?\n        ",
   "describe": {
     "columns": [
       {
@@ -14,13 +14,18 @@
         "type_info": "Text"
       },
       {
-        "name": "created_at",
+        "name": "nonce_hash",
         "ordinal": 2,
+        "type_info": "Text"
+      },
+      {
+        "name": "created_at",
+        "ordinal": 3,
         "type_info": "Datetime"
       },
       {
         "name": "expires_at",
-        "ordinal": 3,
+        "ordinal": 4,
         "type_info": "Datetime"
       }
     ],
@@ -31,8 +36,9 @@
       false,
       false,
       false,
+      false,
       false
     ]
   },
-  "hash": "2d69dcf98650711efedcfb8d294d9a087ca5b21c01b8ca38939fdb01051ed62f"
+  "hash": "5a4aca6f1070cef45e57657c50dd32495c02bf17ed5ac7c05b2c7e540f8d8605"
 }

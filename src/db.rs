@@ -5,6 +5,7 @@ use time::OffsetDateTime;
 pub struct Nonce {
     pub id: i64,
     pub nonce: String,
+    pub nonce_hash: String,
     pub created_at: OffsetDateTime,
     pub expires_at: OffsetDateTime,
 }
@@ -12,14 +13,16 @@ pub struct Nonce {
 pub async fn insert_nonce(
     pool: &Pool<Sqlite>,
     nonce: &str,
+    nonce_hash: &str,
     expires_at: OffsetDateTime,
 ) -> Result<i64, sqlx::Error> {
     let result = sqlx::query!(
         r#"
-        INSERT INTO nonces (nonce, expires_at)
-        VALUES (?, ?)
+        INSERT INTO nonces (nonce, nonce_hash, expires_at)
+        VALUES (?, ?, ?)
         "#,
         nonce,
+        nonce_hash,
         expires_at
     )
     .execute(pool)
@@ -32,7 +35,7 @@ pub async fn get_nonce(pool: &Pool<Sqlite>, nonce: &str) -> Result<Option<Nonce>
     let nonce = sqlx::query_as!(
         Nonce,
         r#"
-        SELECT id, nonce, created_at, expires_at
+        SELECT id, nonce, nonce_hash, created_at, expires_at
         FROM nonces
         WHERE nonce = ?
         "#,

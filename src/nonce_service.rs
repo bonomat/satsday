@@ -1,4 +1,5 @@
 use rand::{Rng, random};
+use sha2::{Sha256, Digest};
 use sqlx::{Pool, Sqlite};
 use std::sync::Arc;
 use time::{Duration as TimeDuration, OffsetDateTime};
@@ -47,9 +48,14 @@ impl NonceService {
                 let new_nonce = random::<u64>();
                 let nonce_str = new_nonce.to_string();
                 
+                // Calculate hash
+                let mut hasher = Sha256::new();
+                hasher.update(&nonce_str);
+                let nonce_hash = format!("{:x}", hasher.finalize());
+                
                 // Store in database
                 let expires_at = OffsetDateTime::now_utc() + TimeDuration::hours(validity_hours as i64);
-                match db::insert_nonce(&db_pool, &nonce_str, expires_at).await {
+                match db::insert_nonce(&db_pool, &nonce_str, &nonce_hash, expires_at).await {
                     Ok(_) => {
                         tracing::info!("🎲 Generated new nonce: {} (expires at {})", new_nonce, expires_at);
                     }
@@ -83,9 +89,14 @@ pub async fn spawn_nonce_service(
     let initial_nonce = service.get_current_nonce().await;
     let nonce_str = initial_nonce.to_string();
     
+    // Calculate hash
+    let mut hasher = Sha256::new();
+    hasher.update(&nonce_str);
+    let nonce_hash = format!("{:x}", hasher.finalize());
+    
     // Store initial nonce in database
     let expires_at = OffsetDateTime::now_utc() + TimeDuration::hours(validity_hours as i64);
-    match db::insert_nonce(&service.db_pool, &nonce_str, expires_at).await {
+    match db::insert_nonce(&service.db_pool, &nonce_str, &nonce_hash, expires_at).await {
         Ok(_) => {
             tracing::info!("🎲 Initial nonce: {} (expires at {})", initial_nonce, expires_at);
         }

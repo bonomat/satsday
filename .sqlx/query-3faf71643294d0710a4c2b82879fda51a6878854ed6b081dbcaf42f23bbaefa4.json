@@ -1,0 +1,12 @@
+{
+  "db_name": "SQLite",
+  "query": "\n        INSERT INTO nonces (nonce, nonce_hash, expires_at)\n        VALUES (?, ?, ?)\n        ",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Right": 3
+    },
+    "nullable": []
+  },
+  "hash": "3faf71643294d0710a4c2b82879fda51a6878854ed6b081dbcaf42f23bbaefa4"
+}
