@@ -1,15 +1,17 @@
 use anyhow::Result;
 use ark_core::server::VtxoOutPoint;
 use ark_core::{ArkAddress, Vtxo};
+use bitcoin::hashes::Hash;
 use std::sync::Arc;
 use tokio::time::{Duration, sleep};
 
-use crate::ArkClient;
+use crate::{ArkClient, nonce_service::NonceService};
 
 pub struct TransactionProcessor {
     ark_client: Arc<ArkClient>,
     my_addresses: Vec<ArkAddress>,
     check_interval: Duration,
+    nonce_service: NonceService,
 }
 
 impl TransactionProcessor {
@@ -17,11 +19,13 @@ impl TransactionProcessor {
         ark_client: Arc<ArkClient>,
         my_addresses: Vec<ArkAddress>,
         check_interval_seconds: u64,
+        nonce_service: NonceService,
     ) -> Self {
         Self {
             ark_client,
             my_addresses,
             check_interval: Duration::from_secs(check_interval_seconds),
+            nonce_service,
         }
     }
 
@@ -86,11 +90,58 @@ impl TransactionProcessor {
             let sender = sender_address.encode();
             tracing::info!(outpoint = ?outpoint.outpoint.txid, amount = ?outpoint.amount, sender, "Found sender");
 
-            // TODO: Add dice game logic here
-            // For now, send back 0.5*amount sats as a test
-            // let amount = outpoint.amount / 2;
-            // let txid = self.ark_client.send(&sender_address, amount).await?;
-            // tracing::info!(?amount, txid = txid.to_string(), "Sent back to sender");
+            // Dice game logic using current nonce
+            let current_nonce = self.nonce_service.get_current_nonce().await;
+            let input_amount = outpoint.amount.to_sat();
+
+            // Simple dice game: hash nonce + outpoint txid
+            let hash_input = format!("{}{}", current_nonce, outpoint.outpoint.txid);
+            let hash = bitcoin::hashes::sha256::Hash::hash(hash_input.as_bytes());
+            let hash_bytes = hash.as_byte_array();
+
+            // Use first 8 bytes as u64 for randomness
+            let random_value = u64::from_be_bytes([
+                hash_bytes[0],
+                hash_bytes[1],
+                hash_bytes[2],
+                hash_bytes[3],
+                hash_bytes[4],
+                hash_bytes[5],
+                hash_bytes[6],
+                hash_bytes[7],
+            ]);
+
+            // Simple game: if random value is even, player wins 1.8x their bet
+            // If odd, house wins and player loses their bet
+            let player_wins = random_value % 2 == 0;
+
+            if player_wins {
+                let payout = (input_amount * 18) / 10; // 1.8x multiplier
+                let payout_amount = bitcoin::Amount::from_sat(payout);
+
+                match self.ark_client.send(&sender_address, payout_amount).await {
+                    Ok(txid) => {
+                        tracing::info!(
+                            nonce = current_nonce,
+                            random = random_value,
+                            bet = input_amount,
+                            payout = payout,
+                            txid = txid.to_string(),
+                            "🎉 Player won! Sent payout"
+                        );
+                    }
+                    Err(e) => {
+                        tracing::error!("Failed to send payout: {}", e);
+                    }
+                }
+            } else {
+                tracing::info!(
+                    nonce = current_nonce,
+                    random = random_value,
+                    bet = input_amount,
+                    "🏠 House won! Player lost their bet"
+                );
+            }
         }
 
         Ok(())
@@ -101,8 +152,14 @@ pub async fn spawn_transaction_monitor(
     ark_client: Arc<ArkClient>,
     my_addresses: Vec<ArkAddress>,
     check_interval_seconds: u64,
+    nonce_service: NonceService,
 ) {
-    let processor = TransactionProcessor::new(ark_client, my_addresses, check_interval_seconds);
+    let processor = TransactionProcessor::new(
+        ark_client,
+        my_addresses,
+        check_interval_seconds,
+        nonce_service,
+    );
 
     tokio::spawn(async move {
         processor.start_monitoring().await;

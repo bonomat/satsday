@@ -633,7 +633,7 @@ impl ArkClient {
             .await?;
         let vtxo_chain = vtxo_chain.chains.inner;
 
-        let mut parent_addresses = vec![];
+        let mut parent_addresses: Vec<ArkAddress> = vec![];
         let vtxo_itself = vtxo_chain.iter().find(|vtxo| vtxo.txid == out_point.txid);
         if vtxo_itself.is_none() {
             tracing::warn!("Parent not found");
@@ -670,7 +670,13 @@ impl ArkClient {
                                 .await;
 
                         if let Some(address) = ark_address {
-                            parent_addresses.push(address);
+                            let address_str = address.encode();
+                            if !parent_addresses
+                                .iter()
+                                .any(|addr| addr.encode() == address_str)
+                            {
+                                parent_addresses.push(address);
+                            }
                         }
                     }
                 }

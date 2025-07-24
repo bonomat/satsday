@@ -4,7 +4,7 @@ use serde_json::{json, Value};
 use std::sync::Arc;
 use tokio::net::TcpListener;
 
-use crate::{transaction_processor::spawn_transaction_monitor, ArkClient};
+use crate::{nonce_service::spawn_nonce_service, transaction_processor::spawn_transaction_monitor, ArkClient};
 
 #[derive(Clone)]
 pub struct AppState {
@@ -21,8 +21,11 @@ pub async fn start_server(ark_client: ArkClient, port: u16) -> Result<()> {
         ark_client: ark_client_arc.clone(),
     };
 
+    // Start nonce service (generate new nonce every 24 hours)
+    let nonce_service = spawn_nonce_service(24).await;
+    
     // Start transaction monitoring in background
-    spawn_transaction_monitor(ark_client_arc, my_addresses, 10).await; // Check every 10 seconds
+    spawn_transaction_monitor(ark_client_arc, my_addresses, 10, nonce_service).await; // Check every 10 seconds
     println!("🔍 Transaction monitoring started (checking every 10 seconds)");
 
     let app = Router::new()
