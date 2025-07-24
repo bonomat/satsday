@@ -84,7 +84,6 @@ impl TransactionProcessor {
             outpoint = ?outpoint.outpoint.txid,
             "Processing spendable outpoint"
         );
-        // dbg!(&outpoint);
 
         let ark_addresses = self.ark_client.get_parent_vtxo(outpoint.outpoint).await?;
 

@@ -1,29 +1,32 @@
 use anyhow::Result;
-use axum::{extract::State, http::StatusCode, response::Json, routing::get, Router};
-use serde_json::{json, Value};
+use axum::{Router, extract::State, http::StatusCode, response::Json, routing::get};
+use serde_json::{Value, json};
+use sqlx::{Pool, Sqlite};
 use std::sync::Arc;
 use tokio::net::TcpListener;
 
-use crate::{nonce_service::spawn_nonce_service, transaction_processor::spawn_transaction_monitor, ArkClient};
+use crate::{
+    ArkClient, nonce_service::spawn_nonce_service, transaction_processor::spawn_transaction_monitor,
+};
 
 #[derive(Clone)]
 pub struct AppState {
     pub ark_client: Arc<ArkClient>,
 }
 
-pub async fn start_server(ark_client: ArkClient, port: u16) -> Result<()> {
+pub async fn start_server(ark_client: ArkClient, port: u16, pool: Pool<Sqlite>) -> Result<()> {
     let ark_client_arc = Arc::new(ark_client);
-    
+
     // Get our addresses for transaction monitoring
     let my_addresses = vec![ark_client_arc.get_address()];
-    
+
     let state = AppState {
         ark_client: ark_client_arc.clone(),
     };
 
     // Start nonce service (generate new nonce every 24 hours)
-    let nonce_service = spawn_nonce_service(24).await;
-    
+    let nonce_service = spawn_nonce_service(pool, 1, 1).await;
+
     // Start transaction monitoring in background
     spawn_transaction_monitor(ark_client_arc, my_addresses, 10, nonce_service).await; // Check every 10 seconds
     println!("🔍 Transaction monitoring started (checking every 10 seconds)");
@@ -35,10 +38,13 @@ pub async fn start_server(ark_client: ArkClient, port: u16) -> Result<()> {
 
     let addr = format!("0.0.0.0:{}", port);
     let listener = TcpListener::bind(&addr).await?;
-    
+
     println!("🚀 Server starting on http://{}", addr);
     println!("📍 Address endpoint: http://{}/address", addr);
-    println!("🚢 Boarding address endpoint: http://{}/boarding-address", addr);
+    println!(
+        "🚢 Boarding address endpoint: http://{}/boarding-address",
+        addr
+    );
 
     axum::serve(listener, app).await?;
 
@@ -47,7 +53,7 @@ pub async fn start_server(ark_client: ArkClient, port: u16) -> Result<()> {
 
 async fn get_address(State(state): State<AppState>) -> Result<Json<Value>, StatusCode> {
     let address = state.ark_client.get_address();
-    
+
     Ok(Json(json!({
         "address": address.to_string()
     })))
@@ -55,7 +61,7 @@ async fn get_address(State(state): State<AppState>) -> Result<Json<Value>, Statu
 
 async fn get_boarding_address(State(state): State<AppState>) -> Result<Json<Value>, StatusCode> {
     let boarding_address = state.ark_client.get_boarding_address();
-    
+
     Ok(Json(json!({
         "boarding_address": boarding_address.to_string()
     })))

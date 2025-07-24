@@ -5,6 +5,7 @@ pub struct Config {
     pub ark_server_url: String,
     pub esplora_url: String,
     pub seed_file: String,
+    pub database: String,
 }
 
 impl Config {
