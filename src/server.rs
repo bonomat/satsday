@@ -14,12 +14,15 @@ pub struct AppState {
 pub async fn start_server(ark_client: ArkClient, port: u16) -> Result<()> {
     let ark_client_arc = Arc::new(ark_client);
     
+    // Get our addresses for transaction monitoring
+    let my_addresses = vec![ark_client_arc.get_address()];
+    
     let state = AppState {
         ark_client: ark_client_arc.clone(),
     };
 
     // Start transaction monitoring in background
-    spawn_transaction_monitor(ark_client_arc, 10).await; // Check every 10 seconds
+    spawn_transaction_monitor(ark_client_arc, my_addresses, 10).await; // Check every 10 seconds
     println!("🔍 Transaction monitoring started (checking every 10 seconds)");
 
     let app = Router::new()

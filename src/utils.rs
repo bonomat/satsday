@@ -1,5 +1,4 @@
-use ark_core::{sort_transactions_by_created_at, ArkTransaction, Vtxo};
-use bitcoin::Amount;
+use ark_core::ArkTransaction;
 use jiff::Timestamp;
 
 pub fn init_tracing() {

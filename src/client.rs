@@ -1,5 +1,4 @@
 use anyhow::{Context, Result, bail};
-use ark_core::server::ChainedTxType;
 use ark_core::{
     ArkAddress, ArkTransaction, BoardingOutput, TxGraph, Vtxo,
     boarding_output::{BoardingOutpoints, list_boarding_outpoints},
@@ -16,8 +15,6 @@ use ark_core::{
     server::{BatchTreeEventType, RoundStreamEvent},
     vtxo::{VirtualTxOutpoints, list_virtual_tx_outpoints},
 };
-use ark_grpc::VtxoChainResponse;
-use bdk_wallet::miniscript::ToPublicKey;
 use bitcoin::key::TweakedPublicKey;
 use bitcoin::{
     Amount, OutPoint, TxOut, Txid, XOnlyPublicKey,
@@ -37,7 +34,6 @@ pub struct ArkClient {
     grpc_client: ark_grpc::Client,
     esplora_client: EsploraClient,
     secret_key: SecretKey,
-    public_key: PublicKey,
     server_info: ark_core::server::Info,
     vtxo: Vtxo,
     boarding_output: BoardingOutput,
@@ -85,7 +81,6 @@ impl ArkClient {
             grpc_client,
             esplora_client,
             secret_key,
-            public_key,
             server_info,
             vtxo,
             boarding_output,
@@ -276,7 +271,7 @@ impl ArkClient {
     }
 
     pub async fn transaction_history(&self) -> Result<Vec<ArkTransaction>> {
-        let boarding_addresses = vec![self.boarding_output.address().clone()];
+        let boarding_addresses = [self.boarding_output.address().clone()];
         let vtxos = vec![self.vtxo.clone()];
 
         let mut boarding_transactions = Vec::new();
@@ -566,7 +561,7 @@ impl ArkClient {
             }
         }
 
-        let round_id = round_finalization_event.id;
+        let _round_id = round_finalization_event.id;
 
         let vtxo_inputs = vtxos
             .spendable
@@ -631,64 +626,58 @@ impl ArkClient {
         Ok(Some(round_finalized_event.commitment_txid))
     }
 
-    pub async fn get_parent_vtxo(&self, out_point: OutPoint) -> Result<Option<ArkAddress>> {
-        let response = self
+    pub async fn get_parent_vtxo(&self, out_point: OutPoint) -> Result<Vec<ArkAddress>> {
+        let vtxo_chain = self
             .grpc_client
             .get_vtxo_chain(Some(out_point), None)
             .await?;
-        dbg!(&response);
-        let parent_virtual = response
-            .chains
-            .inner
-            .iter()
-            .find(|vtxo| vtxo.txid == out_point.txid);
-        if let None = parent_virtual {
+        let vtxo_chain = vtxo_chain.chains.inner;
+
+        let mut parent_addresses = vec![];
+        let vtxo_itself = vtxo_chain.iter().find(|vtxo| vtxo.txid == out_point.txid);
+        if vtxo_itself.is_none() {
             tracing::warn!("Parent not found");
-            return Ok(None);
+            return Ok(vec![]);
         }
-        if let Some(parent_vtxo) = parent_virtual {
-            let parent_checkpoint = response
-                .chains
-                .inner
-                .iter()
-                // FIXME: vout 0 might not be correct here
-                .find(|vtxo| &vtxo.txid == parent_vtxo.spends.get(0).unwrap());
+        if let Some(vtxo_itself) = vtxo_itself {
+            tracing::debug!(
+                txid = ?vtxo_itself.txid,
+                "vtxo itself");
 
-            if let None = parent_checkpoint {
-                tracing::warn!("Parent of parent not found");
-                return Ok(None);
-            }
-            let parent_checkpoint = parent_checkpoint.unwrap();
+            let checkpoint_txes = vtxo_itself.spends.clone();
 
-            let parent_input = response
-                .chains
-                .inner
-                .iter()
-                .find(|vtxo| &vtxo.txid == parent_checkpoint.spends.get(0).unwrap());
-
-            if let None = parent_input {
-                tracing::warn!("Parent of parent not found");
-                return Ok(None);
-            }
-
-            if let Some(vtxo) = parent_input {
-                let response = self
+            for checkpoint_tx in checkpoint_txes {
+                let checkpoint_tx_psbt = self
                     .grpc_client
-                    .get_virtual_txs(vec![vtxo.txid.to_string()], None)
+                    .get_virtual_txs(vec![checkpoint_tx.to_string()], None)
                     .await?;
 
-                let psbt = response.txs.get(0).unwrap();
-                let output = psbt.unsigned_tx.output.get(0).unwrap();
-                let server_x_only = self.server_info.pk.x_only_public_key();
-                let buf = &output.script_pubkey;
-                let ark_address =
-                    get_address_from_output(buf, server_x_only.0, self.server_info.network).await;
+                debug_assert!(checkpoint_tx_psbt.txs.len() == 1);
+                let checkpoint_tx = checkpoint_tx_psbt.txs.first();
 
-                return Ok(ark_address);
+                match checkpoint_tx {
+                    None => {
+                        tracing::error!("Checkpoint tx didn't have a parent")
+                    }
+                    Some(parent) => {
+                        debug_assert!(parent.inputs.len() == 1);
+                        let option = parent.inputs.first().unwrap().witness_utxo.clone();
+                        let txout = option.unwrap();
+                        let server_x_only = self.server_info.pk.x_only_public_key();
+                        let buf = &txout.script_pubkey;
+                        let ark_address =
+                            get_address_from_output(buf, server_x_only.0, self.server_info.network)
+                                .await;
+
+                        if let Some(address) = ark_address {
+                            parent_addresses.push(address);
+                        }
+                    }
+                }
             }
         }
 
-        Ok(None)
+        Ok(parent_addresses)
     }
 }
 
