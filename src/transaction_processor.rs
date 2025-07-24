@@ -46,10 +46,29 @@ impl TransactionProcessor {
 
         let spendable_vtxos = self.ark_client.spendable_vtxos(false).await?;
 
-        for (vtxo, outpoints) in spendable_vtxos {
+        for (vtxo, outpoints) in &spendable_vtxos {
             for outpoint in outpoints {
-                self.process_spendable_outpoint(&vtxo, &outpoint).await?;
+                self.process_spendable_outpoint(vtxo, &outpoint).await?;
             }
+        }
+        let outpoints = spendable_vtxos.values().flatten().collect::<Vec<_>>();
+
+        if outpoints.iter().len() > 1 {
+            let address = self.ark_client.get_address();
+            let coin_select_outpoints: Vec<ark_core::coin_select::VtxoOutPoint> = outpoints
+                .iter()
+                .map(|outpoint| ark_core::coin_select::VtxoOutPoint {
+                    outpoint: outpoint.outpoint,
+                    expire_at: outpoint.expires_at,
+                    amount: outpoint.amount,
+                })
+                .collect();
+
+            let txid = self
+                .ark_client
+                .send_with_outpoints(&address, None, &coin_select_outpoints)
+                .await?;
+            tracing::info!(?txid, "ℹ️ Consolidated all VTXOs");
         }
 
         Ok(())
@@ -62,9 +81,7 @@ impl TransactionProcessor {
     ) -> Result<()> {
         tracing::debug!(
             amount = ?outpoint.amount,
-            outpoint = ?outpoint.outpoint,
-            spent = ?outpoint.is_spent,
-            spent = ?outpoint.spent_by,
+            outpoint = ?outpoint.outpoint.txid,
             "Processing spendable outpoint"
         );
         // dbg!(&outpoint);
@@ -119,19 +136,20 @@ impl TransactionProcessor {
                 let payout = (input_amount * 18) / 10; // 1.8x multiplier
                 let payout_amount = bitcoin::Amount::from_sat(payout);
 
+                tracing::info!(
+                    nonce = current_nonce,
+                    random = random_value,
+                    bet = input_amount,
+                    payout = payout,
+                    "🎉 Player won! Sending payout...."
+                );
+
                 match self.ark_client.send(&sender_address, payout_amount).await {
                     Ok(txid) => {
-                        tracing::info!(
-                            nonce = current_nonce,
-                            random = random_value,
-                            bet = input_amount,
-                            payout = payout,
-                            txid = txid.to_string(),
-                            "🎉 Player won! Sent payout"
-                        );
+                        tracing::info!(txid = txid.to_string(), "🎉 Player won! Sent payout");
                     }
                     Err(e) => {
-                        tracing::error!("Failed to send payout: {}", e);
+                        tracing::error!("🚨 Failed to send payout: {}", e);
                     }
                 }
             } else {

@@ -160,13 +160,53 @@ impl ArkClient {
             })
             .collect::<Vec<_>>();
 
-        let selected_outpoints = select_vtxos(vtxo_outpoints, amount, self.server_info.dust, true)?;
+        let selected_outpoints = if amount == Amount::ZERO {
+            vtxo_outpoints
+        } else {
+            select_vtxos(vtxo_outpoints, amount, self.server_info.dust, true)?
+        };
+
+        // Calculate the actual amount to send (total of selected outpoints when amount is 0)
+        let send_amount = if amount == Amount::ZERO {
+            selected_outpoints.iter().map(|o| o.amount).sum()
+        } else {
+            amount
+        };
+
+        self.send_with_outpoints(address, Some(send_amount), &selected_outpoints).await
+    }
+
+    pub async fn send_with_outpoints(
+        &self,
+        address: &ArkAddress,
+        amount: Option<Amount>,
+        specific_outpoints: &[ark_core::coin_select::VtxoOutPoint],
+    ) -> Result<Txid> {
+        let runtime = tokio::runtime::Handle::current();
+        let find_outpoints_fn =
+            |address: &bitcoin::Address| -> Result<Vec<ark_core::ExplorerUtxo>, ark_core::Error> {
+                block_in_place(|| {
+                    runtime.block_on(async {
+                        let outpoints = self
+                            .esplora_client
+                            .find_outpoints(address)
+                            .await
+                            .map_err(ark_core::Error::ad_hoc)?;
+                        Ok(outpoints)
+                    })
+                })
+            };
+
+        let virtual_tx_outpoints = {
+            let spendable_vtxos = self.spendable_vtxos(false).await?;
+            list_virtual_tx_outpoints(find_outpoints_fn, spendable_vtxos)?
+        };
 
         let vtxo_inputs = virtual_tx_outpoints
             .spendable
             .into_iter()
             .filter(|(outpoint, _)| {
-                selected_outpoints
+                specific_outpoints
                     .iter()
                     .any(|o| o.outpoint == outpoint.outpoint)
             })
@@ -176,11 +216,16 @@ impl ArkClient {
         let change_address = self.vtxo.to_ark_address();
         let kp = Keypair::from_secret_key(&self.secp, &self.secret_key);
 
+        // Calculate the amount to send: either the provided amount or sum of all outpoints
+        let send_amount = amount.unwrap_or_else(|| {
+            specific_outpoints.iter().map(|o| o.amount).sum()
+        });
+
         let OffchainTransactions {
             mut virtual_tx,
             checkpoint_txs,
         } = build_offchain_transactions(
-            &[(address, amount)],
+            &[(address, send_amount)],
             Some(&change_address),
             &vtxo_inputs,
             self.server_info.dust,
@@ -640,10 +685,6 @@ impl ArkClient {
             return Ok(vec![]);
         }
         if let Some(vtxo_itself) = vtxo_itself {
-            tracing::debug!(
-                txid = ?vtxo_itself.txid,
-                "vtxo itself");
-
             let checkpoint_txes = vtxo_itself.spends.clone();
 
             for checkpoint_tx in checkpoint_txes {
