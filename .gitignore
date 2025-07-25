@@ -3,3 +3,4 @@ ark.config.toml
 ark.seed
 .claude
 .idea
+db.sqlite
