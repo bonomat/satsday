@@ -11,6 +11,7 @@ pub fn init_tracing() {
              h2=warn,\
              reqwest=info,\
              ark_core=info,\
+             sqlx::query=warn,\
              rustls=info",
         )
         .init()

@@ -173,7 +173,8 @@ impl ArkClient {
             amount
         };
 
-        self.send_with_outpoints(address, Some(send_amount), &selected_outpoints).await
+        self.send_with_outpoints(address, Some(send_amount), &selected_outpoints)
+            .await
     }
 
     pub async fn send_with_outpoints(
@@ -217,9 +218,8 @@ impl ArkClient {
         let kp = Keypair::from_secret_key(&self.secp, &self.secret_key);
 
         // Calculate the amount to send: either the provided amount or sum of all outpoints
-        let send_amount = amount.unwrap_or_else(|| {
-            specific_outpoints.iter().map(|o| o.amount).sum()
-        });
+        let send_amount =
+            amount.unwrap_or_else(|| specific_outpoints.iter().map(|o| o.amount).sum());
 
         let OffchainTransactions {
             mut virtual_tx,
@@ -672,11 +672,13 @@ impl ArkClient {
     }
 
     pub async fn get_parent_vtxo(&self, out_point: OutPoint) -> Result<Vec<ArkAddress>> {
+        tracing::debug!("Getting parent vtxo");
         let vtxo_chain = self
             .grpc_client
-            .get_vtxo_chain(Some(out_point), None)
+            .get_vtxo_chain(Some(out_point), Some((10, 0)))
             .await?;
         let vtxo_chain = vtxo_chain.chains.inner;
+        tracing::debug!("Received vtxo chain");
 
         let mut parent_addresses: Vec<ArkAddress> = vec![];
         let vtxo_itself = vtxo_chain.iter().find(|vtxo| vtxo.txid == out_point.txid);
@@ -692,6 +694,7 @@ impl ArkClient {
                     .grpc_client
                     .get_virtual_txs(vec![checkpoint_tx.to_string()], None)
                     .await?;
+                tracing::debug!("Received checkpoint tx");
 
                 debug_assert!(checkpoint_tx_psbt.txs.len() == 1);
                 let checkpoint_tx = checkpoint_tx_psbt.txs.first();

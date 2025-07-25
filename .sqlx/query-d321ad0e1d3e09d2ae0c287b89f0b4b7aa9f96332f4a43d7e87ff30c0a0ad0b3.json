@@ -1,0 +1,12 @@
+{
+  "db_name": "SQLite",
+  "query": "\n        INSERT INTO game_results (\n            nonce, rolled_number, input_tx_id, output_tx_id,\n            bet_amount, winning_amount, player_address,\n            is_winner, payment_successful\n        )\n        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)\n        ",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Right": 9
+    },
+    "nullable": []
+  },
+  "hash": "d321ad0e1d3e09d2ae0c287b89f0b4b7aa9f96332f4a43d7e87ff30c0a0ad0b3"
+}

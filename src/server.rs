@@ -25,10 +25,10 @@ pub async fn start_server(ark_client: ArkClient, port: u16, pool: Pool<Sqlite>) 
     };
 
     // Start nonce service (generate new nonce every 24 hours)
-    let nonce_service = spawn_nonce_service(pool, 1, 1).await;
+    let nonce_service = spawn_nonce_service(pool.clone(), 1, 1).await;
 
     // Start transaction monitoring in background
-    spawn_transaction_monitor(ark_client_arc, my_addresses, 10, nonce_service).await; // Check every 10 seconds
+    spawn_transaction_monitor(ark_client_arc, my_addresses, 10, nonce_service, pool).await;
     println!("🔍 Transaction monitoring started (checking every 10 seconds)");
 
     let app = Router::new()
