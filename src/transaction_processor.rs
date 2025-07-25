@@ -55,53 +55,27 @@ impl TransactionProcessor {
                 let tx_id = outpoint.outpoint.txid.to_string();
 
                 // Check if this is our own transaction
-                match db::is_own_transaction(&self.db_pool, &tx_id).await {
-                    Ok(true) => {
+                let is_own_tx = db::is_own_transaction(&self.db_pool, &tx_id).await;
+                let is_tx_processed = db::is_transaction_processed(&self.db_pool, &tx_id).await;
+
+                match (is_tx_processed, is_own_tx) {
+                    (Ok(false), Ok(false)) => {
+                        tracing::debug!(tx_id, "Processing new transaction");
+                        self.process_spendable_outpoint(vtxo, &outpoint).await?;
+                    }
+                    (Ok(true), _) => {
+                        tracing::debug!(tx_id, "Transaction already processed, skipping");
+                        continue;
+                    }
+                    (_, Ok(true)) => {
                         tracing::debug!(tx_id, "Own transaction, skipping");
                         continue;
                     }
-                    Ok(false) => {
-                        // Not our own transaction, check if already processed
-                        match db::is_transaction_processed(&self.db_pool, &tx_id).await {
-                            Ok(true) => {
-                                tracing::debug!(tx_id, "Transaction already processed, skipping");
-                                continue;
-                            }
-                            Ok(false) => {
-                                // Process the transaction
-                                self.process_spendable_outpoint(vtxo, &outpoint).await?;
-                            }
-                            Err(e) => {
-                                tracing::error!(
-                                    tx_id,
-                                    "Error checking if transaction is processed: {}",
-                                    e
-                                );
-                                // Continue processing in case of DB error to avoid missing transactions
-                                self.process_spendable_outpoint(vtxo, &outpoint).await?;
-                            }
-                        }
+                    (Err(e), Ok(_)) => {
+                        tracing::error!(tx_id, "Error checking if transaction is processed: {}", e);
                     }
-                    Err(e) => {
+                    (_, Err(e)) => {
                         tracing::error!(tx_id, "Error checking if transaction is own: {}", e);
-                        // Continue with normal processing in case of DB error
-                        match db::is_transaction_processed(&self.db_pool, &tx_id).await {
-                            Ok(true) => {
-                                tracing::debug!(tx_id, "Transaction already processed, skipping");
-                                continue;
-                            }
-                            Ok(false) => {
-                                self.process_spendable_outpoint(vtxo, &outpoint).await?;
-                            }
-                            Err(e) => {
-                                tracing::error!(
-                                    tx_id,
-                                    "Error checking if transaction is processed: {}",
-                                    e
-                                );
-                                self.process_spendable_outpoint(vtxo, &outpoint).await?;
-                            }
-                        }
                     }
                 }
             }
