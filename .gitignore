@@ -4,3 +4,4 @@ ark.seed
 .claude
 .idea
 db.sqlite
+*.seed

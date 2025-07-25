@@ -44,14 +44,14 @@ async fn main() -> Result<()> {
 
     let config = Config::from_file(&cli.config)?;
 
-    let seed = std::fs::read_to_string(&config.seed_file)?;
-    let secret_key = SecretKey::from_str(seed.trim())?;
+    let main_seed = std::fs::read_to_string(&config.main_seed_file)?;
+    let main_secret_key = SecretKey::from_str(main_seed.trim())?;
 
     let db_url = config.database.clone();
     let pool = SqlitePoolOptions::new().connect(db_url.as_str()).await?;
     MIGRATOR.run(&pool).await?;
 
-    let client = ArkClient::new(config, secret_key).await?;
+    let client = ArkClient::new(config, main_secret_key).await?;
 
     match cli.command {
         Commands::Start { port } => {
