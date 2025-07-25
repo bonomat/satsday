@@ -33,9 +33,8 @@ use crate::{config::Config, esplora::EsploraClient};
 pub struct ArkClient {
     grpc_client: ark_grpc::Client,
     esplora_client: EsploraClient,
-    secret_key: SecretKey,
     server_info: ark_core::server::Info,
-    vtxo: Vtxo,
+    main_address: (Vtxo, SecretKey),
     boarding_output: BoardingOutput,
     secp: Secp256k1<secp256k1::All>,
 }
@@ -80,16 +79,15 @@ impl ArkClient {
         Ok(Self {
             grpc_client,
             esplora_client,
-            secret_key,
             server_info,
-            vtxo,
+            main_address: (vtxo, secret_key),
             boarding_output,
             secp,
         })
     }
 
     pub fn get_address(&self) -> ArkAddress {
-        self.vtxo.to_ark_address()
+        self.main_address.0.to_ark_address()
     }
 
     pub fn get_boarding_address(&self) -> bitcoin::Address {
@@ -214,8 +212,9 @@ impl ArkClient {
             .map(|(outpoint, vtxo)| VtxoInput::new(vtxo, outpoint.amount, outpoint.outpoint))
             .collect::<Vec<_>>();
 
-        let change_address = self.vtxo.to_ark_address();
-        let kp = Keypair::from_secret_key(&self.secp, &self.secret_key);
+        let (main_address, main_sk) = &self.main_address;
+        let change_address = main_address.to_ark_address();
+        let kp = Keypair::from_secret_key(&self.secp, main_sk);
 
         // Calculate the amount to send: either the provided amount or sum of all outpoints
         let send_amount =
@@ -317,7 +316,7 @@ impl ArkClient {
 
     pub async fn transaction_history(&self) -> Result<Vec<ArkTransaction>> {
         let boarding_addresses = [self.boarding_output.address().clone()];
-        let vtxos = vec![self.vtxo.clone()];
+        let vtxos = vec![self.main_address.0.clone()];
 
         let mut boarding_transactions = Vec::new();
         let mut boarding_round_transactions = Vec::new();
@@ -372,7 +371,7 @@ impl ArkClient {
         let mut spendable_vtxos = HashMap::new();
         let vtxo_outpoints = self
             .grpc_client
-            .list_vtxos(&self.vtxo.to_ark_address())
+            .list_vtxos(&self.main_address.0.to_ark_address())
             .await?;
 
         let spendable = if select_recoverable_vtxos {
@@ -381,7 +380,7 @@ impl ArkClient {
             vtxo_outpoints.spendable().to_vec()
         };
 
-        spendable_vtxos.insert(self.vtxo.clone(), spendable);
+        spendable_vtxos.insert(self.main_address.0.clone(), spendable);
         Ok(spendable_vtxos)
     }
 
@@ -397,7 +396,8 @@ impl ArkClient {
         }
 
         let cosigner_kp = Keypair::new(&self.secp, &mut rng);
-        let to_address = self.vtxo.to_ark_address();
+        let (main_address, main_sk) = &self.main_address;
+        let to_address = main_address.to_ark_address();
 
         let round_inputs = {
             let boarding_inputs = boarding_outputs.spendable.clone().into_iter().map(
@@ -453,7 +453,7 @@ impl ArkClient {
             .map(|k| k.public_key())
             .collect::<Vec<_>>();
 
-        let signing_kp = Keypair::from_secret_key(&self.secp, &self.secret_key);
+        let signing_kp = Keypair::from_secret_key(&self.secp, main_sk);
         let sign_for_onchain_pk_fn = |_: &XOnlyPublicKey,
                                       msg: &secp256k1::Message|
          -> Result<schnorr::Signature, ark_core::Error> {

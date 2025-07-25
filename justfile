@@ -26,3 +26,6 @@ run:
 
 balance:
     cargo run -- balance
+
+settle:
+    cargo run -- settle
