@@ -672,55 +672,67 @@ impl ArkClient {
     }
 
     pub async fn get_parent_vtxo(&self, out_point: OutPoint) -> Result<Vec<ArkAddress>> {
-        tracing::debug!("Getting parent vtxo");
-        let vtxo_chain = self
+        tracing::trace!(
+            txid = ?out_point.txid,
+            "Getting parent vtxo");
+        let vtxo = self
             .grpc_client
-            .get_vtxo_chain(Some(out_point), Some((10, 0)))
+            .get_virtual_txs(vec![out_point.txid.to_string()], None)
             .await?;
-        let vtxo_chain = vtxo_chain.chains.inner;
-        tracing::debug!("Received vtxo chain");
+        let parent_checkoints = vtxo
+            .txs
+            .iter()
+            .map(|tx| {
+                tx.unsigned_tx
+                    .input
+                    .iter()
+                    .map(|input| input.previous_output.clone())
+                    .collect::<Vec<_>>()
+            })
+            .flatten()
+            .collect::<Vec<_>>();
 
-        let mut parent_addresses: Vec<ArkAddress> = vec![];
-        let vtxo_itself = vtxo_chain.iter().find(|vtxo| vtxo.txid == out_point.txid);
-        if vtxo_itself.is_none() {
-            tracing::warn!("Parent not found");
+        if parent_checkoints.is_empty() {
+            tracing::warn!("No parent found");
             return Ok(vec![]);
         }
-        if let Some(vtxo_itself) = vtxo_itself {
-            let checkpoint_txes = vtxo_itself.spends.clone();
 
-            for checkpoint_tx in checkpoint_txes {
-                let checkpoint_tx_psbt = self
-                    .grpc_client
-                    .get_virtual_txs(vec![checkpoint_tx.to_string()], None)
-                    .await?;
-                tracing::debug!("Received checkpoint tx");
+        let mut parent_addresses: Vec<ArkAddress> = vec![];
 
-                debug_assert!(checkpoint_tx_psbt.txs.len() == 1);
-                let checkpoint_tx = checkpoint_tx_psbt.txs.first();
+        for parent_checkpoint_outpoint in parent_checkoints {
+            let parent_checkpoint_txid = parent_checkpoint_outpoint.txid.to_string();
+            let parent_checkpoint_psbt = self
+                .grpc_client
+                .get_virtual_txs(vec![parent_checkpoint_txid.clone()], None)
+                .await?;
+            tracing::trace!(
+                parent_checkpoint_txid = parent_checkpoint_txid,
+                "Received checkpoint tx"
+            );
+            debug_assert!(parent_checkpoint_psbt.txs.len() == 1);
+            let checkpoint_tx = parent_checkpoint_psbt.txs.first();
 
-                match checkpoint_tx {
-                    None => {
-                        tracing::error!("Checkpoint tx didn't have a parent")
-                    }
-                    Some(parent) => {
-                        debug_assert!(parent.inputs.len() == 1);
-                        let option = parent.inputs.first().unwrap().witness_utxo.clone();
-                        let txout = option.unwrap();
-                        let server_x_only = self.server_info.pk.x_only_public_key();
-                        let buf = &txout.script_pubkey;
-                        let ark_address =
-                            get_address_from_output(buf, server_x_only.0, self.server_info.network)
-                                .await;
+            match checkpoint_tx {
+                None => {
+                    tracing::error!("Checkpoint tx didn't have a parent")
+                }
+                Some(parent) => {
+                    debug_assert!(parent.inputs.len() == 1);
+                    let option = parent.inputs.first().unwrap().witness_utxo.clone();
+                    let txout = option.unwrap();
+                    let server_x_only = self.server_info.pk.x_only_public_key();
+                    let buf = &txout.script_pubkey;
+                    let ark_address =
+                        get_address_from_output(buf, server_x_only.0, self.server_info.network)
+                            .await;
 
-                        if let Some(address) = ark_address {
-                            let address_str = address.encode();
-                            if !parent_addresses
-                                .iter()
-                                .any(|addr| addr.encode() == address_str)
-                            {
-                                parent_addresses.push(address);
-                            }
+                    if let Some(address) = ark_address {
+                        let address_str = address.encode();
+                        if !parent_addresses
+                            .iter()
+                            .any(|addr| addr.encode() == address_str)
+                        {
+                            parent_addresses.push(address);
                         }
                     }
                 }
