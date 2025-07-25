@@ -1,7 +1,7 @@
 use anyhow::Result;
 use bitcoin::secp256k1::SecretKey;
 use clap::Parser;
-use satoshi_dice::{ArkClient, Config, utils::init_tracing};
+use satoshi_dice::{ArkClient, Config, db, utils::init_tracing};
 use sqlx::migrate::Migrator;
 use sqlx::sqlite::SqlitePoolOptions;
 use std::str::FromStr;
@@ -85,10 +85,16 @@ async fn main() -> Result<()> {
             let ark_address = ark_core::ArkAddress::decode(&address)?;
             let amount = bitcoin::Amount::from_sat(amount);
             let txid = client.send(&ark_address, amount).await?;
+
             println!("Sent {} to {} in transaction {}", amount, address, txid);
+            db::insert_own_transaction(&pool, txid.to_string().as_str(), "manual_send").await?;
         }
         Commands::Settle => match client.settle().await? {
-            Some(txid) => println!("Settlement completed. Round TXID: {}", txid),
+            Some(txid) => {
+                println!("Settlement completed. Round TXID: {}", txid);
+                db::insert_own_transaction(&pool, txid.to_string().as_str(), "consolidation")
+                    .await?;
+            }
             None => println!("No boarding outputs or VTXOs to settle"),
         },
         Commands::History => {
