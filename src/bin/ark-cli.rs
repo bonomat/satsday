@@ -27,13 +27,13 @@ enum Commands {
     },
     Balance,
     Address,
+    GameAddresses,
     BoardingAddress,
     Send {
         address: String,
         amount: u64,
     },
     Settle,
-    History,
 }
 
 #[tokio::main]
@@ -44,14 +44,20 @@ async fn main() -> Result<()> {
 
     let config = Config::from_file(&cli.config)?;
 
-    let main_seed = std::fs::read_to_string(&config.main_seed_file)?;
+    let main_seed = std::fs::read_to_string(&config.seed_file_main)?;
     let main_secret_key = SecretKey::from_str(main_seed.trim())?;
+
+    let seed_1_5x = std::fs::read_to_string(&config.seed_file_1_5x)?;
+    let seed_1_5x = SecretKey::from_str(seed_1_5x.trim())?;
+
+    let seed_2x = std::fs::read_to_string(&config.seed_file_2x)?;
+    let seed_2x = SecretKey::from_str(seed_2x.trim())?;
 
     let db_url = config.database.clone();
     let pool = SqlitePoolOptions::new().connect(db_url.as_str()).await?;
     MIGRATOR.run(&pool).await?;
 
-    let client = ArkClient::new(config, main_secret_key).await?;
+    let client = ArkClient::new(config, main_secret_key, seed_1_5x, seed_2x).await?;
 
     match cli.command {
         Commands::Start { port } => {
@@ -78,6 +84,15 @@ async fn main() -> Result<()> {
         Commands::Address => {
             println!("Offchain address: {}", client.get_address());
         }
+        Commands::GameAddresses => {
+            let game_addresses = client
+                .get_game_addresses()
+                .iter()
+                .map(|(multiplier, address)| format!("{} - {}", multiplier, address.encode()))
+                .collect::<Vec<_>>();
+
+            println!("Game addresses: {:?}", game_addresses);
+        }
         Commands::BoardingAddress => {
             println!("Boarding address: {}", client.get_boarding_address());
         }
@@ -97,16 +112,6 @@ async fn main() -> Result<()> {
             }
             None => println!("No boarding outputs or VTXOs to settle"),
         },
-        Commands::History => {
-            let transactions = client.transaction_history().await?;
-            if transactions.is_empty() {
-                println!("No transactions found");
-            } else {
-                for tx in transactions {
-                    println!("{}\n", satoshi_dice::utils::pretty_print_transaction(&tx)?);
-                }
-            }
-        }
     }
 
     Ok(())

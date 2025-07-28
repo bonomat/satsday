@@ -154,6 +154,7 @@ impl TransactionProcessor {
                     "🎉 Player won! Sending payout...."
                 );
 
+                // TODO: we should send to all addresses at the same time
                 match self.ark_client.send(&sender_address, payout_amount).await {
                     Ok(txid) => {
                         tracing::info!(txid = txid.to_string(), "🎉 Player won! Sent payout");

@@ -1,6 +1,6 @@
 use anyhow::{Context, Result, bail};
 use ark_core::{
-    ArkAddress, ArkTransaction, BoardingOutput, TxGraph, Vtxo,
+    ArkAddress, BoardingOutput, TxGraph, Vtxo,
     boarding_output::{BoardingOutpoints, list_boarding_outpoints},
     coin_select::select_vtxos,
     proof_of_funds,
@@ -26,6 +26,7 @@ use bitcoin::{
 use futures::StreamExt;
 use rand::thread_rng;
 use std::collections::HashMap;
+use std::fmt::{Display, Formatter};
 use tokio::task::block_in_place;
 
 use crate::{config::Config, esplora::EsploraClient};
@@ -37,6 +38,7 @@ pub struct ArkClient {
     main_address: (Vtxo, SecretKey),
     boarding_output: BoardingOutput,
     secp: Secp256k1<secp256k1::All>,
+    game_addresses: Vec<GameArkAddress>,
 }
 
 #[derive(Debug)]
@@ -49,9 +51,16 @@ pub struct Balance {
 }
 
 impl ArkClient {
-    pub async fn new(config: Config, secret_key: SecretKey) -> Result<Self> {
+    pub async fn new(
+        config: Config,
+        main_sk: SecretKey,
+        seed_1_5x_sk: SecretKey,
+        seed_2x_sk: SecretKey,
+    ) -> Result<Self> {
         let secp = Secp256k1::new();
-        let public_key = PublicKey::from_secret_key(&secp, &secret_key);
+        let main_pk = PublicKey::from_secret_key(&secp, &main_sk);
+        let seed_1_5x_pk = PublicKey::from_secret_key(&secp, &seed_1_5x_sk);
+        let seed_2x_pk = PublicKey::from_secret_key(&secp, &seed_2x_sk);
 
         let mut grpc_client = ark_grpc::Client::new(config.ark_server_url);
         grpc_client.connect().await?;
@@ -59,10 +68,26 @@ impl ArkClient {
         let server_info = grpc_client.get_info().await?;
         let esplora_client = EsploraClient::new(&config.esplora_url)?;
 
-        let vtxo = Vtxo::new(
+        let main_vtxo = Vtxo::new(
             &secp,
             server_info.pk.x_only_public_key().0,
-            public_key.x_only_public_key().0,
+            main_pk.x_only_public_key().0,
+            vec![],
+            server_info.unilateral_exit_delay,
+            server_info.network,
+        )?;
+        let seed_1_5x_vtxo = Vtxo::new(
+            &secp,
+            server_info.pk.x_only_public_key().0,
+            seed_1_5x_pk.x_only_public_key().0,
+            vec![],
+            server_info.unilateral_exit_delay,
+            server_info.network,
+        )?;
+        let seed_2x_pk_vtxo = Vtxo::new(
+            &secp,
+            server_info.pk.x_only_public_key().0,
+            seed_2x_pk.x_only_public_key().0,
             vec![],
             server_info.unilateral_exit_delay,
             server_info.network,
@@ -71,7 +96,7 @@ impl ArkClient {
         let boarding_output = BoardingOutput::new(
             &secp,
             server_info.pk.x_only_public_key().0,
-            public_key.x_only_public_key().0,
+            main_pk.x_only_public_key().0,
             server_info.boarding_exit_delay,
             server_info.network,
         )?;
@@ -80,7 +105,19 @@ impl ArkClient {
             grpc_client,
             esplora_client,
             server_info,
-            main_address: (vtxo, secret_key),
+            main_address: (main_vtxo, main_sk),
+            game_addresses: vec![
+                GameArkAddress {
+                    multiplier: Multiplier::X15,
+                    vtxo: seed_1_5x_vtxo,
+                    secret_key: seed_1_5x_sk,
+                },
+                GameArkAddress {
+                    multiplier: Multiplier::X2,
+                    vtxo: seed_2x_pk_vtxo,
+                    secret_key: seed_2x_sk,
+                },
+            ],
             boarding_output,
             secp,
         })
@@ -314,65 +351,32 @@ impl ArkClient {
             .await
     }
 
-    pub async fn transaction_history(&self) -> Result<Vec<ArkTransaction>> {
-        let boarding_addresses = [self.boarding_output.address().clone()];
-        let vtxos = vec![self.main_address.0.clone()];
-
-        let mut boarding_transactions = Vec::new();
-        let mut boarding_round_transactions = Vec::new();
-
-        for boarding_address in boarding_addresses.iter() {
-            let outpoints = self.esplora_client.find_outpoints(boarding_address).await?;
-
-            for utxo in outpoints.iter() {
-                let confirmed_at = utxo.confirmation_blocktime.map(|t| t as i64);
-
-                boarding_transactions.push(ArkTransaction::Boarding {
-                    txid: utxo.outpoint.txid,
-                    amount: utxo.amount,
-                    confirmed_at,
-                });
-
-                let status = self
-                    .esplora_client
-                    .get_output_status(&utxo.outpoint.txid, utxo.outpoint.vout)
-                    .await?;
-
-                if let Some(spend_txid) = status.spend_txid {
-                    boarding_round_transactions.push(spend_txid);
-                }
-            }
-        }
-
-        let mut offchain_transactions = Vec::new();
-        for vtxo in vtxos.iter() {
-            let txs = self
-                .grpc_client
-                .get_tx_history(&vtxo.to_ark_address())
-                .await?;
-
-            for tx in txs {
-                if !boarding_round_transactions.contains(&tx.txid()) {
-                    offchain_transactions.push(tx);
-                }
-            }
-        }
-
-        let mut txs = [boarding_transactions, offchain_transactions].concat();
-        ark_core::sort_transactions_by_created_at(&mut txs);
-
-        Ok(txs)
-    }
-
     pub async fn spendable_vtxos(
         &self,
         select_recoverable_vtxos: bool,
     ) -> Result<HashMap<Vtxo, Vec<ark_core::server::VtxoOutPoint>>> {
         let mut spendable_vtxos = HashMap::new();
-        let vtxo_outpoints = self
-            .grpc_client
-            .list_vtxos(&self.main_address.0.to_ark_address())
+
+        let main = self
+            ._spendable_vtxos(self.main_address.0.clone(), select_recoverable_vtxos)
             .await?;
+        spendable_vtxos.insert(main.0, main.1);
+        for game_address in &self.game_addresses {
+            let spendable = self
+                ._spendable_vtxos(game_address.vtxo.clone(), select_recoverable_vtxos)
+                .await?;
+            spendable_vtxos.insert(spendable.0, spendable.1);
+        }
+
+        Ok(spendable_vtxos)
+    }
+
+    pub async fn _spendable_vtxos(
+        &self,
+        vtxo: Vtxo,
+        select_recoverable_vtxos: bool,
+    ) -> Result<(Vtxo, Vec<ark_core::server::VtxoOutPoint>)> {
+        let vtxo_outpoints = self.grpc_client.list_vtxos(&vtxo.to_ark_address()).await?;
 
         let spendable = if select_recoverable_vtxos {
             vtxo_outpoints.spendable_with_recoverable()
@@ -380,8 +384,7 @@ impl ArkClient {
             vtxo_outpoints.spendable().to_vec()
         };
 
-        spendable_vtxos.insert(self.main_address.0.clone(), spendable);
-        Ok(spendable_vtxos)
+        Ok((vtxo, spendable))
     }
 
     async fn settle_internal(
@@ -453,15 +456,23 @@ impl ArkClient {
             .map(|k| k.public_key())
             .collect::<Vec<_>>();
 
-        let signing_kp = Keypair::from_secret_key(&self.secp, main_sk);
-        let sign_for_onchain_pk_fn = |_: &XOnlyPublicKey,
+        let main_signing_kp = Keypair::from_secret_key(&self.secp, main_sk);
+        let mut signing_kps = self
+            .game_addresses
+            .iter()
+            .map(|game_ark_address| game_ark_address.secret_key.keypair(&self.secp))
+            .collect::<Vec<_>>();
+        signing_kps.push(main_signing_kp);
+
+        let sign_for_onchain_pk_fn = |xonly_public_key: &XOnlyPublicKey,
                                       msg: &secp256k1::Message|
          -> Result<schnorr::Signature, ark_core::Error> {
-            Ok(self.secp.sign_schnorr_no_aux_rand(msg, &signing_kp))
+            tracing::debug!("Signing for key {xonly_public_key}");
+            Ok(self.secp.sign_schnorr_no_aux_rand(msg, &main_signing_kp))
         };
 
         let (bip322_proof, intent_message) = proof_of_funds::make_bip322_signature(
-            &signing_kp,
+            signing_kps.as_slice(),
             sign_for_onchain_pk_fn,
             round_inputs,
             round_outputs,
@@ -625,11 +636,28 @@ impl ArkClient {
             let connectors_graph = TxGraph::new(connectors_graph_chunks)?;
 
             create_and_sign_forfeit_txs(
-                &signing_kp,
                 vtxo_inputs.as_slice(),
                 &connectors_graph.leaves(),
                 &self.server_info.forfeit_address,
                 self.server_info.dust,
+                |msg, vtxo| {
+                    let ark_address = vtxo.to_ark_address().encode();
+                    let kp = if ark_address == main_address.to_ark_address().encode() {
+                        main_signing_kp
+                    } else {
+                        let maybe_kp = self.game_addresses.iter().find_map(|game_address| {
+                            if game_address.vtxo.to_ark_address().encode() == ark_address {
+                                Some(game_address.secret_key.keypair(&self.secp))
+                            } else {
+                                None
+                            }
+                        });
+                        maybe_kp.unwrap()
+                    };
+                    let sig = self.secp.sign_schnorr_no_aux_rand(msg, &kp);
+                    let pk = kp.x_only_public_key().0;
+                    (sig, pk)
+                },
             )?
         } else {
             Vec::new()
@@ -651,7 +679,7 @@ impl ArkClient {
             let sign_for_pk_fn = |_: &XOnlyPublicKey,
                                   msg: &secp256k1::Message|
              -> Result<schnorr::Signature, ark_core::Error> {
-                Ok(self.secp.sign_schnorr_no_aux_rand(msg, &signing_kp))
+                Ok(self.secp.sign_schnorr_no_aux_rand(msg, &main_signing_kp))
             };
 
             sign_round_psbt(sign_for_pk_fn, &mut round_psbt, &onchain_inputs)?;
@@ -740,6 +768,35 @@ impl ArkClient {
         }
 
         Ok(parent_addresses)
+    }
+
+    pub fn get_game_addresses(&self) -> Vec<(Multiplier, ArkAddress)> {
+        let vec = self.game_addresses.clone();
+        vec.iter()
+            .map(|a| (a.multiplier, a.vtxo.to_ark_address()))
+            .collect()
+    }
+}
+
+#[derive(Debug, Clone)]
+struct GameArkAddress {
+    multiplier: Multiplier,
+    vtxo: Vtxo,
+    secret_key: SecretKey,
+}
+
+#[derive(Debug, Clone, Copy)]
+pub enum Multiplier {
+    X15,
+    X2,
+}
+
+impl Display for Multiplier {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Multiplier::X15 => write!(f, "X15"),
+            Multiplier::X2 => write!(f, "X2"),
+        }
     }
 }
 

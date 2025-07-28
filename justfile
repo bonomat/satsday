@@ -29,3 +29,9 @@ balance:
 
 settle:
     cargo run -- settle
+
+address:
+    cargo run -- address
+
+game-addresses:
+    cargo run -- game-addresses

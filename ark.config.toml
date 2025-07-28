@@ -1,4 +1,6 @@
 ark_server_url = "http://localhost:7070"
 esplora_url = "http://localhost:30000"
-main_seed_file = "./main_seed_file.seed"
+seed_file_main = "./main_seed_file.seed"
+seed_file_1_5x = "./1_5x_seed_file.seed"
+seed_file_2x = "./2x_seed_file.seed"
 database = "./db.sqlite"
