@@ -1,10 +1,8 @@
 import './App.css'
-import {Button} from "@/components/ui/button.tsx";
+import { ArkDice } from './components/ArkDice'
 
 function App() {
-    return (
-        <Button>Click me</Button>
-    )
+    return <ArkDice />
 }
 
 export default App
