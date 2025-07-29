@@ -78,12 +78,12 @@ async fn get_boarding_address(State(state): State<AppState>) -> Result<Json<Valu
 
 async fn get_game_addresses(State(state): State<AppState>) -> Result<Json<Value>, StatusCode> {
     let game_addresses = state.ark_client.get_game_addresses();
-    
+
     let addresses: Vec<GameAddressInfo> = game_addresses
         .into_iter()
         .map(|(multiplier, address)| {
             let win_probability = multiplier.get_lower_than() as f64 / 65536.0 * 100.0;
-            
+
             GameAddressInfo {
                 address: address.encode(),
                 multiplier: multiplier.to_string(),
@@ -93,7 +93,7 @@ async fn get_game_addresses(State(state): State<AppState>) -> Result<Json<Value>
             }
         })
         .collect();
-    
+
     Ok(Json(json!({
         "game_addresses": addresses,
         "info": {
