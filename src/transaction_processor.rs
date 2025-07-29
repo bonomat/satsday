@@ -6,6 +6,7 @@ use sqlx::{Pool, Sqlite};
 use std::sync::Arc;
 use tokio::time::{Duration, sleep};
 
+use crate::key_derivation::Multiplier;
 use crate::{ArkClient, db, nonce_service::NonceService};
 
 pub struct TransactionProcessor {
@@ -50,7 +51,7 @@ impl TransactionProcessor {
 
         let spendable_vtxos = self.ark_client.spendable_game_vtxos(false).await?;
 
-        for (vtxo, outpoints) in &spendable_vtxos {
+        for (multiplier, outpoints) in &spendable_vtxos {
             for outpoint in outpoints {
                 let tx_id = outpoint.outpoint.txid.to_string();
 
@@ -61,7 +62,8 @@ impl TransactionProcessor {
                 match (is_tx_processed, is_own_tx) {
                     (Ok(false), Ok(false)) => {
                         tracing::debug!(tx_id, "Processing new transaction");
-                        self.process_spendable_outpoint(vtxo, outpoint).await?;
+                        self.process_spendable_outpoint(multiplier, outpoint)
+                            .await?;
                     }
                     (Ok(true), _) => {
                         tracing::debug!(tx_id, "Transaction already processed, skipping");
@@ -86,7 +88,7 @@ impl TransactionProcessor {
 
     async fn process_spendable_outpoint(
         &self,
-        _vtxo: &Vtxo,
+        multiplier: &Multiplier,
         outpoint: &VirtualTxOutPoint,
     ) -> Result<()> {
         tracing::debug!(

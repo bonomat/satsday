@@ -1,7 +1,7 @@
-use anyhow::{anyhow, Result};
+use anyhow::{Result, anyhow};
+use bitcoin::Network;
 use bitcoin::bip32::{DerivationPath, Xpriv};
 use bitcoin::secp256k1::Secp256k1;
-use bitcoin::Network;
 use std::str::FromStr;
 
 /// Multiplier options for the dice game
@@ -10,7 +10,9 @@ pub enum Multiplier {
     X105,    // 1.05x
     X110,    // 1.10x
     X133,    // 1.33x
+    X150,    // 1.5x
     X200,    // 2.00x
+    X300,    // 3.00x
     X1000,   // 10.00x
     X2500,   // 25.00x
     X5000,   // 50.00x
@@ -25,7 +27,9 @@ impl Multiplier {
             Multiplier::X105 => 105,
             Multiplier::X110 => 110,
             Multiplier::X133 => 133,
+            Multiplier::X150 => 150,
             Multiplier::X200 => 200,
+            Multiplier::X300 => 300,
             Multiplier::X1000 => 1000,
             Multiplier::X2500 => 2500,
             Multiplier::X5000 => 5000,
@@ -40,20 +44,31 @@ impl Multiplier {
             Multiplier::X105 => 0,
             Multiplier::X110 => 1,
             Multiplier::X133 => 2,
-            Multiplier::X200 => 3,
-            Multiplier::X1000 => 4,
-            Multiplier::X2500 => 5,
-            Multiplier::X5000 => 6,
-            Multiplier::X10000 => 7,
-            Multiplier::X100000 => 8,
+            Multiplier::X150 => 3,
+            Multiplier::X200 => 4,
+            Multiplier::X300 => 5,
+            Multiplier::X1000 => 6,
+            Multiplier::X2500 => 7,
+            Multiplier::X5000 => 8,
+            Multiplier::X10000 => 9,
+            Multiplier::X100000 => 10,
         }
     }
 
-    /// Get the win probability (as percentage)
-    pub fn win_probability(&self) -> f64 {
-        // House edge is typically 1%, so true odds = 100 / multiplier * 0.99
-        let base_probability = 100.0 / (self.value() as f64 / 100.0);
-        base_probability * 0.99 // 1% house edge
+    pub const fn get_lower_than(&self) -> u16 {
+        match self {
+            Multiplier::X105 => 60_541,
+            Multiplier::X110 => 57_789,
+            Multiplier::X133 => 47_796,
+            Multiplier::X150 => 42_379,
+            Multiplier::X200 => 31_784,
+            Multiplier::X300 => 21_189,
+            Multiplier::X1000 => 6_356,
+            Multiplier::X2500 => 2_542,
+            Multiplier::X5000 => 1_271,
+            Multiplier::X10000 => 635,
+            Multiplier::X100000 => 64,
+        }
     }
 
     /// Create from index
@@ -62,12 +77,14 @@ impl Multiplier {
             0 => Some(Multiplier::X105),
             1 => Some(Multiplier::X110),
             2 => Some(Multiplier::X133),
-            3 => Some(Multiplier::X200),
-            4 => Some(Multiplier::X1000),
-            5 => Some(Multiplier::X2500),
-            6 => Some(Multiplier::X5000),
-            7 => Some(Multiplier::X10000),
-            8 => Some(Multiplier::X100000),
+            3 => Some(Multiplier::X150),
+            4 => Some(Multiplier::X200),
+            5 => Some(Multiplier::X300),
+            6 => Some(Multiplier::X1000),
+            7 => Some(Multiplier::X2500),
+            8 => Some(Multiplier::X5000),
+            9 => Some(Multiplier::X10000),
+            10 => Some(Multiplier::X100000),
             _ => None,
         }
     }
@@ -78,7 +95,9 @@ impl Multiplier {
             Multiplier::X105,
             Multiplier::X110,
             Multiplier::X133,
+            Multiplier::X150,
             Multiplier::X200,
+            Multiplier::X300,
             Multiplier::X1000,
             Multiplier::X2500,
             Multiplier::X5000,

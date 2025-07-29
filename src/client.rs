@@ -1,5 +1,5 @@
-use anyhow::{Context, Result, bail};
 use crate::key_derivation::{KeyDerivation, Multiplier};
+use anyhow::{Context, Result, bail};
 use ark_core::batch::{
     create_and_sign_forfeit_txs, generate_nonce_tree, sign_batch_tree, sign_commitment_psbt,
 };
@@ -52,15 +52,20 @@ pub struct Balance {
 impl ArkClient {
     pub async fn new(config: Config) -> Result<Self> {
         let secp = Secp256k1::new();
-        
+
         // Read master seed and create key derivation
         let master_seed = std::fs::read_to_string(&config.master_seed_file)
-            .with_context(|| format!("Failed to read master seed file: {}", config.master_seed_file))?
+            .with_context(|| {
+                format!(
+                    "Failed to read master seed file: {}",
+                    config.master_seed_file
+                )
+            })?
             .trim()
             .to_string();
-        
+
         let key_derivation = KeyDerivation::from_seed(&master_seed, bitcoin::Network::Bitcoin)?;
-        
+
         // Derive main key
         let main_sk_bytes = key_derivation.get_main_secret_key()?;
         let main_sk = SecretKey::from_slice(&main_sk_bytes)?;
@@ -97,7 +102,7 @@ impl ArkClient {
             let game_sk_bytes = key_derivation.get_game_secret_key(multiplier)?;
             let game_sk = SecretKey::from_slice(&game_sk_bytes)?;
             let game_pk = PublicKey::from_secret_key(&secp, &game_sk);
-            
+
             let game_vtxo = Vtxo::new(
                 &secp,
                 server_info.pk.x_only_public_key().0,
@@ -106,7 +111,7 @@ impl ArkClient {
                 server_info.unilateral_exit_delay,
                 server_info.network,
             )?;
-            
+
             game_addresses.push(GameArkAddress {
                 multiplier,
                 vtxo: game_vtxo,
@@ -398,13 +403,14 @@ impl ArkClient {
     pub async fn spendable_game_vtxos(
         &self,
         select_recoverable_vtxos: bool,
-    ) -> Result<HashMap<Vtxo, Vec<ark_core::server::VirtualTxOutPoint>>> {
+    ) -> Result<HashMap<Multiplier, Vec<ark_core::server::VirtualTxOutPoint>>> {
         let mut spendable_vtxos = HashMap::new();
 
         for game_address in &self.game_addresses {
-            let spendable = self
+            let (_, outpoints) = self
                 ._spendable_vtxos(game_address.vtxo.clone(), select_recoverable_vtxos)
                 .await?;
+            let spendable = (game_address.multiplier, outpoints);
             spendable_vtxos.insert(spendable.0, spendable.1);
         }
 
@@ -825,7 +831,6 @@ struct GameArkAddress {
     vtxo: Vtxo,
     secret_key: SecretKey,
 }
-
 
 async fn get_address_from_output(
     script: &bitcoin::ScriptBuf,
