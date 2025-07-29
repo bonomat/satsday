@@ -1,6 +1,6 @@
 use anyhow::Result;
+use ark_core::ArkAddress;
 use ark_core::server::VirtualTxOutPoint;
-use ark_core::{ArkAddress, Vtxo};
 use bitcoin::hashes::Hash;
 use sqlx::{Pool, Sqlite};
 use std::sync::Arc;
@@ -127,39 +127,31 @@ impl TransactionProcessor {
             let hash = bitcoin::hashes::sha256::Hash::hash(hash_input.as_bytes());
             let hash_bytes = hash.as_byte_array();
 
-            // Use first 8 bytes as u64 for randomness
-            let random_value = u64::from_be_bytes([
-                hash_bytes[0],
-                hash_bytes[1],
-                hash_bytes[2],
-                hash_bytes[3],
-                hash_bytes[4],
-                hash_bytes[5],
-                hash_bytes[6],
-                hash_bytes[7],
-            ]);
+            // Use first 2 bytes as u16 for randomness (0-65535 range)
+            let random_value = u16::from_be_bytes([hash_bytes[0], hash_bytes[1]]);
 
-            // Simple game: if random value is even, player wins 1.8x their bet
-            // If odd, house wins and player loses their bet
-            let player_wins = random_value % 2 == 0;
-            let rolled_number = (random_value % 100) as i64; // Convert to 0-99 range for display
+            let rolled_number = random_value as i64;
+
+            let player_wins = multiplier.is_win(random_value);
+            let max_value = multiplier.get_lower_than();
 
             if player_wins {
-                let payout = (input_amount * 18) / 10; // 1.8x multiplier
+                let payout = (input_amount * multiplier.multiplier()) / 100; //
                 let payout_amount = bitcoin::Amount::from_sat(payout);
 
                 tracing::info!(
-                    nonce = current_nonce,
-                    random = random_value,
+                    max_value = max_value,
+                    rolled_number = random_value,
                     bet_amount = input_amount,
                     payout = payout,
+                    nonce = current_nonce,
                     "🎉 Player won! Sending payout...."
                 );
 
                 // TODO: we should send to all addresses at the same time
                 match self.ark_client.send(&sender_address, payout_amount).await {
                     Ok(txid) => {
-                        tracing::info!(txid = txid.to_string(), "🎉 Player won! Sent payout");
+                        tracing::debug!(txid = txid.to_string(), "🎉 Player won! Sent payout");
 
                         // Store this as our own transaction
                         if let Err(e) =
@@ -211,9 +203,10 @@ impl TransactionProcessor {
                 }
             } else {
                 tracing::info!(
-                    nonce = current_nonce,
-                    random = random_value,
+                    max_value = max_value,
+                    rolled_number = random_value,
                     bet = input_amount,
+                    nonce = current_nonce,
                     "🏠 House won! Player lost their bet"
                 );
 

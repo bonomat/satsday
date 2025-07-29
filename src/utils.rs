@@ -1,7 +1,7 @@
 pub fn init_tracing() {
     tracing_subscriber::fmt()
         .with_env_filter(
-            "debug,\
+            "info,\
              tower=info,\
              hyper_util=info,\
              hyper=info,\

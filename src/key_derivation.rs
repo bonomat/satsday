@@ -22,7 +22,7 @@ pub enum Multiplier {
 
 impl Multiplier {
     /// Get the actual multiplier value (e.g., 1.05 becomes 105, 2.0 becomes 200)
-    pub fn value(&self) -> u32 {
+    pub fn multiplier(&self) -> u64 {
         match self {
             Multiplier::X105 => 105,
             Multiplier::X110 => 110,
@@ -71,6 +71,10 @@ impl Multiplier {
         }
     }
 
+    pub(crate) fn is_win(&self, rolled_number: u16) -> bool {
+        rolled_number < self.get_lower_than()
+    }
+
     /// Create from index
     pub fn from_index(index: u32) -> Option<Self> {
         match index {
@@ -109,7 +113,7 @@ impl Multiplier {
 
 impl std::fmt::Display for Multiplier {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        let value = self.value() as f64 / 100.0;
+        let value = self.multiplier() as f64 / 100.0;
         if value < 2.0 {
             write!(f, "{:.2}x", value)
         } else {
