@@ -85,6 +85,7 @@ pub async fn is_nonce_valid(pool: &Pool<Sqlite>, nonce: &str) -> Result<bool, sq
     Ok(result.count > 0)
 }
 
+#[allow(clippy::too_many_arguments)]
 pub async fn insert_game_result(
     pool: &Pool<Sqlite>,
     nonce: &str,
@@ -159,10 +160,7 @@ pub async fn insert_own_transaction(
     Ok(result.last_insert_rowid())
 }
 
-pub async fn is_own_transaction(
-    pool: &Pool<Sqlite>,
-    tx_id: &str,
-) -> Result<bool, sqlx::Error> {
+pub async fn is_own_transaction(pool: &Pool<Sqlite>, tx_id: &str) -> Result<bool, sqlx::Error> {
     let result = sqlx::query!(
         r#"
         SELECT COUNT(*) as count

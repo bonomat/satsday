@@ -61,9 +61,13 @@ async fn main() -> Result<()> {
 
     match cli.command {
         Commands::Start { port } => {
+            let game_addresses = client.get_game_addresses();
             println!("🎲 Starting Satoshi Dice server...");
             println!("📍 Offchain address: {}", client.get_address());
             println!("🚢 Boarding address: {}", client.get_boarding_address());
+            for (multiplier, address) in game_addresses {
+                println!("👾Game Address {}: {}", multiplier, address.encode());
+            }
 
             let balance = client.get_balance().await?;
             println!("💰 Balance: {:?}", balance);

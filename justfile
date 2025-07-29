@@ -35,3 +35,6 @@ address:
 
 game-addresses:
     cargo run -- game-addresses
+
+send address amount:
+    cargo run -- send {{ address }} {{ amount }}

@@ -249,9 +249,8 @@ impl ArkClient {
             .map(|(outpoint, vtxo)| VtxoInput::new(vtxo, outpoint.amount, outpoint.outpoint))
             .collect::<Vec<_>>();
 
-        let (main_address, main_sk) = &self.main_address;
+        let (main_address, _) = &self.main_address;
         let change_address = main_address.to_ark_address();
-        let kp = Keypair::from_secret_key(&self.secp, main_sk);
 
         // Calculate the amount to send: either the provided amount or sum of all outpoints
         let send_amount =
@@ -267,19 +266,38 @@ impl ArkClient {
             self.server_info.dust,
         )?;
 
-        let sign_fn = |msg: secp256k1::Message| -> Result<(schnorr::Signature, XOnlyPublicKey), ark_core::Error> {
+        let mut all_keys = vec![self.main_address.clone()];
+        for game_address in &self.game_addresses {
+            all_keys.push((game_address.vtxo.clone(), game_address.secret_key));
+        }
+
+        let sign_fn = |msg: secp256k1::Message,
+                       vtxo: &Vtxo|
+         -> Result<(schnorr::Signature, XOnlyPublicKey), ark_core::Error> {
+            // TODO: find the correct kp here, not sure how yet.
+            let kp = all_keys.iter().find_map(|(v, sk)| {
+                if v.to_ark_address().encode() == vtxo.to_ark_address().encode() {
+                    Some(sk.keypair(&self.secp))
+                } else {
+                    None
+                }
+            });
+            let kp = kp
+                .context("Key not found for vtxo")
+                .map_err(ark_core::Error::ad_hoc)?;
+
             let sig = self.secp.sign_schnorr_no_aux_rand(&msg, &kp);
             let pk = kp.x_only_public_key().0;
             Ok((sig, pk))
         };
 
-        for i in 0..checkpoint_txs.len() {
+        for (i, (_, _, _, vtxo)) in checkpoint_txs.iter().enumerate() {
             sign_offchain_virtual_transaction(
-                sign_fn,
+                |msg| sign_fn(msg, vtxo),
                 &mut virtual_tx,
                 &checkpoint_txs
                     .iter()
-                    .map(|(_, output, outpoint)| (output.clone(), *outpoint))
+                    .map(|(_, output, outpoint, _)| (output.clone(), *outpoint))
                     .collect::<Vec<_>>(),
                 i,
             )?;
@@ -293,7 +311,7 @@ impl ArkClient {
                 virtual_tx,
                 checkpoint_txs
                     .into_iter()
-                    .map(|(psbt, _, _)| psbt)
+                    .map(|(psbt, _, _, _)| psbt)
                     .collect(),
             )
             .await
@@ -312,7 +330,11 @@ impl ArkClient {
                     )
                 })?;
 
-            sign_checkpoint_transaction(sign_fn, checkpoint_psbt, vtxo_input)?;
+            sign_checkpoint_transaction(
+                |msg| sign_fn(msg, vtxo_input.vtxo()),
+                checkpoint_psbt,
+                vtxo_input,
+            )?;
         }
 
         self.grpc_client
@@ -361,6 +383,22 @@ impl ArkClient {
             ._spendable_vtxos(self.main_address.0.clone(), select_recoverable_vtxos)
             .await?;
         spendable_vtxos.insert(main.0, main.1);
+        for game_address in &self.game_addresses {
+            let spendable = self
+                ._spendable_vtxos(game_address.vtxo.clone(), select_recoverable_vtxos)
+                .await?;
+            spendable_vtxos.insert(spendable.0, spendable.1);
+        }
+
+        Ok(spendable_vtxos)
+    }
+
+    pub async fn spendable_game_vtxos(
+        &self,
+        select_recoverable_vtxos: bool,
+    ) -> Result<HashMap<Vtxo, Vec<ark_core::server::VtxoOutPoint>>> {
+        let mut spendable_vtxos = HashMap::new();
+
         for game_address in &self.game_addresses {
             let spendable = self
                 ._spendable_vtxos(game_address.vtxo.clone(), select_recoverable_vtxos)
@@ -652,7 +690,7 @@ impl ArkClient {
                                 None
                             }
                         });
-                        maybe_kp.unwrap()
+                        maybe_kp.expect("to have a key")
                     };
                     let sig = self.secp.sign_schnorr_no_aux_rand(msg, &kp);
                     let pk = kp.x_only_public_key().0;
@@ -710,14 +748,13 @@ impl ArkClient {
         let parent_checkoints = vtxo
             .txs
             .iter()
-            .map(|tx| {
+            .flat_map(|tx| {
                 tx.unsigned_tx
                     .input
                     .iter()
-                    .map(|input| input.previous_output.clone())
+                    .map(|input| input.previous_output)
                     .collect::<Vec<_>>()
             })
-            .flatten()
             .collect::<Vec<_>>();
 
         if parent_checkoints.is_empty() {
@@ -747,7 +784,8 @@ impl ArkClient {
                 Some(parent) => {
                     debug_assert!(parent.inputs.len() == 1);
                     let option = parent.inputs.first().unwrap().witness_utxo.clone();
-                    let txout = option.unwrap();
+                    let txout =
+                        option.ok_or_else(|| ark_core::Error::ad_hoc("Could not find input"))?;
                     let server_x_only = self.server_info.pk.x_only_public_key();
                     let buf = &txout.script_pubkey;
                     let ark_address =
@@ -808,11 +846,12 @@ async fn get_address_from_output(
     let script = script.as_script();
     let instruction = script.instructions();
     let mut enumerate = instruction.enumerate();
-    let (_, res) = enumerate.nth(1).unwrap();
+    let (_, res) = enumerate.nth(1).expect("No more instructions");
     let instruction = res.unwrap();
     match instruction {
         bitcoin::script::Instruction::PushBytes(b) => {
-            let vtxo_tap_key = XOnlyPublicKey::from_slice(b.as_bytes()).unwrap();
+            let vtxo_tap_key =
+                XOnlyPublicKey::from_slice(b.as_bytes()).expect("to have x-only-public key");
             let vtxo_tap_key = TweakedPublicKey::dangerous_assume_tweaked(vtxo_tap_key);
             let address = ArkAddress::new(network, server_pk, vtxo_tap_key);
             Some(address)
