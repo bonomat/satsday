@@ -1,19 +1,18 @@
 use anyhow::{Context, Result, bail};
+use ark_core::batch::{
+    create_and_sign_forfeit_txs, generate_nonce_tree, sign_batch_tree, sign_commitment_psbt,
+};
+use ark_core::send::sign_ark_transaction;
+use ark_core::server::{GetVtxosRequest, StreamEvent};
+use ark_core::vtxo::VirtualTxOutPoints;
 use ark_core::{
-    ArkAddress, BoardingOutput, TxGraph, Vtxo,
+    ArkAddress, BoardingOutput, TxGraph, Vtxo, batch,
     boarding_output::{BoardingOutpoints, list_boarding_outpoints},
     coin_select::select_vtxos,
-    proof_of_funds,
-    redeem::{
-        OffchainTransactions, VtxoInput, build_offchain_transactions, sign_checkpoint_transaction,
-        sign_offchain_virtual_transaction,
-    },
-    round::{
-        OnChainInput, VtxoInput as RoundVtxoInput, create_and_sign_forfeit_txs,
-        generate_nonce_tree, sign_round_psbt, sign_vtxo_tree,
-    },
-    server::{BatchTreeEventType, RoundStreamEvent},
-    vtxo::{VirtualTxOutpoints, list_virtual_tx_outpoints},
+    proof_of_funds, send,
+    send::{OffchainTransactions, build_offchain_transactions, sign_checkpoint_transaction},
+    server::BatchTreeEventType,
+    vtxo::list_virtual_tx_outpoints,
 };
 use bitcoin::key::TweakedPublicKey;
 use bitcoin::{
@@ -188,7 +187,7 @@ impl ArkClient {
         let vtxo_outpoints = virtual_tx_outpoints
             .spendable
             .iter()
-            .map(|(outpoint, _)| ark_core::coin_select::VtxoOutPoint {
+            .map(|(outpoint, _)| ark_core::coin_select::VirtualTxOutPoint {
                 outpoint: outpoint.outpoint,
                 expire_at: outpoint.expires_at,
                 amount: outpoint.amount,
@@ -216,7 +215,7 @@ impl ArkClient {
         &self,
         address: &ArkAddress,
         amount: Option<Amount>,
-        specific_outpoints: &[ark_core::coin_select::VtxoOutPoint],
+        specific_outpoints: &[ark_core::coin_select::VirtualTxOutPoint],
     ) -> Result<Txid> {
         let runtime = tokio::runtime::Handle::current();
         let find_outpoints_fn =
@@ -246,7 +245,7 @@ impl ArkClient {
                     .iter()
                     .any(|o| o.outpoint == outpoint.outpoint)
             })
-            .map(|(outpoint, vtxo)| VtxoInput::new(vtxo, outpoint.amount, outpoint.outpoint))
+            .map(|(outpoint, vtxo)| send::VtxoInput::new(vtxo, outpoint.amount, outpoint.outpoint))
             .collect::<Vec<_>>();
 
         let (main_address, _) = &self.main_address;
@@ -257,8 +256,8 @@ impl ArkClient {
             amount.unwrap_or_else(|| specific_outpoints.iter().map(|o| o.amount).sum());
 
         let OffchainTransactions {
-            mut virtual_tx,
             checkpoint_txs,
+            mut ark_tx,
         } = build_offchain_transactions(
             &[(address, send_amount)],
             Some(&change_address),
@@ -292,9 +291,9 @@ impl ArkClient {
         };
 
         for (i, (_, _, _, vtxo)) in checkpoint_txs.iter().enumerate() {
-            sign_offchain_virtual_transaction(
+            sign_ark_transaction(
                 |msg| sign_fn(msg, vtxo),
-                &mut virtual_tx,
+                &mut ark_tx,
                 &checkpoint_txs
                     .iter()
                     .map(|(_, output, outpoint, _)| (output.clone(), *outpoint))
@@ -303,12 +302,12 @@ impl ArkClient {
             )?;
         }
 
-        let virtual_txid = virtual_tx.unsigned_tx.compute_txid();
+        let virtual_txid = ark_tx.unsigned_tx.compute_txid();
 
         let mut res = self
             .grpc_client
             .submit_offchain_transaction_request(
-                virtual_tx,
+                ark_tx,
                 checkpoint_txs
                     .into_iter()
                     .map(|(psbt, _, _, _)| psbt)
@@ -376,7 +375,7 @@ impl ArkClient {
     pub async fn spendable_vtxos(
         &self,
         select_recoverable_vtxos: bool,
-    ) -> Result<HashMap<Vtxo, Vec<ark_core::server::VtxoOutPoint>>> {
+    ) -> Result<HashMap<Vtxo, Vec<ark_core::server::VirtualTxOutPoint>>> {
         let mut spendable_vtxos = HashMap::new();
 
         let main = self
@@ -396,7 +395,7 @@ impl ArkClient {
     pub async fn spendable_game_vtxos(
         &self,
         select_recoverable_vtxos: bool,
-    ) -> Result<HashMap<Vtxo, Vec<ark_core::server::VtxoOutPoint>>> {
+    ) -> Result<HashMap<Vtxo, Vec<ark_core::server::VirtualTxOutPoint>>> {
         let mut spendable_vtxos = HashMap::new();
 
         for game_address in &self.game_addresses {
@@ -413,8 +412,9 @@ impl ArkClient {
         &self,
         vtxo: Vtxo,
         select_recoverable_vtxos: bool,
-    ) -> Result<(Vtxo, Vec<ark_core::server::VtxoOutPoint>)> {
-        let vtxo_outpoints = self.grpc_client.list_vtxos(&vtxo.to_ark_address()).await?;
+    ) -> Result<(Vtxo, Vec<ark_core::server::VirtualTxOutPoint>)> {
+        let request = GetVtxosRequest::new_for_addresses(&[vtxo.to_ark_address()]);
+        let vtxo_outpoints = self.grpc_client.list_vtxos(request).await?;
 
         let spendable = if select_recoverable_vtxos {
             vtxo_outpoints.spendable_with_recoverable()
@@ -427,7 +427,7 @@ impl ArkClient {
 
     async fn settle_internal(
         &self,
-        vtxos: VirtualTxOutpoints,
+        vtxos: VirtualTxOutPoints,
         boarding_outputs: BoardingOutpoints,
     ) -> Result<Option<Txid>> {
         let mut rng = thread_rng();
@@ -538,7 +538,7 @@ impl ArkClient {
         let mut vtxo_graph_chunks = Vec::new();
 
         let batch_started_event = match event_stream.next().await {
-            Some(Ok(RoundStreamEvent::BatchStarted(e))) => e,
+            Some(Ok(StreamEvent::BatchStarted(e))) => e,
             other => bail!("Did not get round signing event: {other:?}"),
         };
 
@@ -564,13 +564,13 @@ impl ArkClient {
         let round_signing_event;
         loop {
             match event_stream.next().await {
-                Some(Ok(RoundStreamEvent::TreeTx(e))) => match e.batch_tree_event_type {
+                Some(Ok(StreamEvent::TreeTx(e))) => match e.batch_tree_event_type {
                     BatchTreeEventType::Vtxo => vtxo_graph_chunks.push(e.tx_graph_chunk),
                     BatchTreeEventType::Connector => {
                         bail!("Unexpected connector batch tree event");
                     }
                 },
-                Some(Ok(RoundStreamEvent::TreeSigningStarted(e))) => {
+                Some(Ok(StreamEvent::TreeSigningStarted(e))) => {
                     round_signing_event = e;
                     break;
                 }
@@ -586,7 +586,7 @@ impl ArkClient {
             &mut rng,
             &vtxo_graph,
             cosigner_kp.public_key(),
-            &round_signing_event.unsigned_round_tx,
+            &round_signing_event.unsigned_commitment_tx,
         )?;
 
         self.grpc_client
@@ -598,19 +598,19 @@ impl ArkClient {
             .await?;
 
         let round_signing_nonces_generated_event = match event_stream.next().await {
-            Some(Ok(RoundStreamEvent::TreeNoncesAggregated(e))) => e,
+            Some(Ok(StreamEvent::TreeNoncesAggregated(e))) => e,
             other => bail!("Did not get round signing nonces generated event: {other:?}"),
         };
 
         let round_id = round_signing_nonces_generated_event.id;
         let agg_pub_nonce_tree = round_signing_nonces_generated_event.tree_nonces;
 
-        let partial_sig_tree = sign_vtxo_tree(
+        let partial_sig_tree = sign_batch_tree(
             self.server_info.vtxo_tree_expiry,
             self.server_info.pk.x_only_public_key().0,
             &cosigner_kp,
             &vtxo_graph,
-            &round_signing_event.unsigned_round_tx,
+            &round_signing_event.unsigned_commitment_tx,
             nonce_tree,
             &agg_pub_nonce_tree,
         )?;
@@ -624,7 +624,7 @@ impl ArkClient {
         let round_finalization_event;
         loop {
             match event_stream.next().await {
-                Some(Ok(RoundStreamEvent::TreeTx(e))) => match e.batch_tree_event_type {
+                Some(Ok(StreamEvent::TreeTx(e))) => match e.batch_tree_event_type {
                     BatchTreeEventType::Vtxo => {
                         bail!("Unexpected VTXO batch tree event");
                     }
@@ -632,7 +632,7 @@ impl ArkClient {
                         connectors_graph_chunks.push(e.tx_graph_chunk);
                     }
                 },
-                Some(Ok(RoundStreamEvent::TreeSignature(e))) => match e.batch_tree_event_type {
+                Some(Ok(StreamEvent::TreeSignature(e))) => match e.batch_tree_event_type {
                     BatchTreeEventType::Vtxo => {
                         vtxo_graph.apply(|graph| {
                             if graph.root().unsigned_tx.compute_txid() != e.txid {
@@ -647,7 +647,7 @@ impl ArkClient {
                         bail!("received batch tree signature for connectors tree");
                     }
                 },
-                Some(Ok(RoundStreamEvent::BatchFinalization(e))) => {
+                Some(Ok(StreamEvent::BatchFinalization(e))) => {
                     round_finalization_event = e;
                     break;
                 }
@@ -661,7 +661,7 @@ impl ArkClient {
             .spendable
             .into_iter()
             .map(|(outpoint, vtxo)| {
-                RoundVtxoInput::new(
+                batch::VtxoInput::new(
                     vtxo,
                     outpoint.amount,
                     outpoint.outpoint,
@@ -705,7 +705,7 @@ impl ArkClient {
             .spendable
             .into_iter()
             .map(|(outpoint, amount, boarding_output)| {
-                OnChainInput::new(boarding_output, amount, outpoint)
+                batch::OnChainInput::new(boarding_output, amount, outpoint)
             })
             .collect::<Vec<_>>();
 
@@ -720,7 +720,7 @@ impl ArkClient {
                 Ok(self.secp.sign_schnorr_no_aux_rand(msg, &main_signing_kp))
             };
 
-            sign_round_psbt(sign_for_pk_fn, &mut round_psbt, &onchain_inputs)?;
+            sign_commitment_psbt(sign_for_pk_fn, &mut round_psbt, &onchain_inputs)?;
 
             Some(round_psbt)
         };
@@ -730,7 +730,7 @@ impl ArkClient {
             .await?;
 
         let round_finalized_event = match event_stream.next().await {
-            Some(Ok(RoundStreamEvent::BatchFinalized(e))) => e,
+            Some(Ok(StreamEvent::BatchFinalized(e))) => e,
             other => bail!("Did not get round finalized event: {other:?}"),
         };
 

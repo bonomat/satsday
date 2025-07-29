@@ -1,5 +1,5 @@
 use anyhow::Result;
-use ark_core::server::VtxoOutPoint;
+use ark_core::server::VirtualTxOutPoint;
 use ark_core::{ArkAddress, Vtxo};
 use bitcoin::hashes::Hash;
 use sqlx::{Pool, Sqlite};
@@ -61,7 +61,7 @@ impl TransactionProcessor {
                 match (is_tx_processed, is_own_tx) {
                     (Ok(false), Ok(false)) => {
                         tracing::debug!(tx_id, "Processing new transaction");
-                        self.process_spendable_outpoint(vtxo, &outpoint).await?;
+                        self.process_spendable_outpoint(vtxo, outpoint).await?;
                     }
                     (Ok(true), _) => {
                         tracing::debug!(tx_id, "Transaction already processed, skipping");
@@ -87,7 +87,7 @@ impl TransactionProcessor {
     async fn process_spendable_outpoint(
         &self,
         _vtxo: &Vtxo,
-        outpoint: &VtxoOutPoint,
+        outpoint: &VirtualTxOutPoint,
     ) -> Result<()> {
         tracing::debug!(
             amount = ?outpoint.amount,

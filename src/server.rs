@@ -39,12 +39,9 @@ pub async fn start_server(ark_client: ArkClient, port: u16, pool: Pool<Sqlite>) 
     let addr = format!("0.0.0.0:{port}");
     let listener = TcpListener::bind(&addr).await?;
 
-    println!("🚀 Server starting on http://{}", addr);
-    println!("📍 Address endpoint: http://{}/address", addr);
-    println!(
-        "🚢 Boarding address endpoint: http://{}/boarding-address",
-        addr
-    );
+    println!("🚀 Server starting on http://{addr}",);
+    println!("📍 Address endpoint: http://{addr}/address",);
+    println!("🚢 Boarding address endpoint: http://{addr}/boarding-address",);
 
     axum::serve(listener, app).await?;
 
