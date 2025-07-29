@@ -2,6 +2,7 @@ pub mod client;
 pub mod config;
 pub mod db;
 pub mod esplora;
+pub mod key_derivation;
 pub mod nonce_service;
 pub mod server;
 pub mod transaction_processor;

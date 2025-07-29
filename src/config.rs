@@ -4,9 +4,7 @@ use serde::Deserialize;
 pub struct Config {
     pub ark_server_url: String,
     pub esplora_url: String,
-    pub seed_file_main: String,
-    pub seed_file_1_5x: String,
-    pub seed_file_2x: String,
+    pub master_seed_file: String,
     pub database: String,
 }
 

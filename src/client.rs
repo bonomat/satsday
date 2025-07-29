@@ -1,4 +1,5 @@
 use anyhow::{Context, Result, bail};
+use crate::key_derivation::{KeyDerivation, Multiplier};
 use ark_core::batch::{
     create_and_sign_forfeit_txs, generate_nonce_tree, sign_batch_tree, sign_commitment_psbt,
 };
@@ -25,7 +26,6 @@ use bitcoin::{
 use futures::StreamExt;
 use rand::thread_rng;
 use std::collections::HashMap;
-use std::fmt::{Display, Formatter};
 use tokio::task::block_in_place;
 
 use crate::{config::Config, esplora::EsploraClient};
@@ -50,16 +50,21 @@ pub struct Balance {
 }
 
 impl ArkClient {
-    pub async fn new(
-        config: Config,
-        main_sk: SecretKey,
-        seed_1_5x_sk: SecretKey,
-        seed_2x_sk: SecretKey,
-    ) -> Result<Self> {
+    pub async fn new(config: Config) -> Result<Self> {
         let secp = Secp256k1::new();
+        
+        // Read master seed and create key derivation
+        let master_seed = std::fs::read_to_string(&config.master_seed_file)
+            .with_context(|| format!("Failed to read master seed file: {}", config.master_seed_file))?
+            .trim()
+            .to_string();
+        
+        let key_derivation = KeyDerivation::from_seed(&master_seed, bitcoin::Network::Bitcoin)?;
+        
+        // Derive main key
+        let main_sk_bytes = key_derivation.get_main_secret_key()?;
+        let main_sk = SecretKey::from_slice(&main_sk_bytes)?;
         let main_pk = PublicKey::from_secret_key(&secp, &main_sk);
-        let seed_1_5x_pk = PublicKey::from_secret_key(&secp, &seed_1_5x_sk);
-        let seed_2x_pk = PublicKey::from_secret_key(&secp, &seed_2x_sk);
 
         let mut grpc_client = ark_grpc::Client::new(config.ark_server_url);
         grpc_client.connect().await?;
@@ -67,6 +72,7 @@ impl ArkClient {
         let server_info = grpc_client.get_info().await?;
         let esplora_client = EsploraClient::new(&config.esplora_url)?;
 
+        // Create main VTXO
         let main_vtxo = Vtxo::new(
             &secp,
             server_info.pk.x_only_public_key().0,
@@ -75,23 +81,8 @@ impl ArkClient {
             server_info.unilateral_exit_delay,
             server_info.network,
         )?;
-        let seed_1_5x_vtxo = Vtxo::new(
-            &secp,
-            server_info.pk.x_only_public_key().0,
-            seed_1_5x_pk.x_only_public_key().0,
-            vec![],
-            server_info.unilateral_exit_delay,
-            server_info.network,
-        )?;
-        let seed_2x_pk_vtxo = Vtxo::new(
-            &secp,
-            server_info.pk.x_only_public_key().0,
-            seed_2x_pk.x_only_public_key().0,
-            vec![],
-            server_info.unilateral_exit_delay,
-            server_info.network,
-        )?;
 
+        // Create boarding output
         let boarding_output = BoardingOutput::new(
             &secp,
             server_info.pk.x_only_public_key().0,
@@ -100,23 +91,35 @@ impl ArkClient {
             server_info.network,
         )?;
 
+        // Generate all game addresses using key derivation
+        let mut game_addresses = Vec::new();
+        for multiplier in Multiplier::all() {
+            let game_sk_bytes = key_derivation.get_game_secret_key(multiplier)?;
+            let game_sk = SecretKey::from_slice(&game_sk_bytes)?;
+            let game_pk = PublicKey::from_secret_key(&secp, &game_sk);
+            
+            let game_vtxo = Vtxo::new(
+                &secp,
+                server_info.pk.x_only_public_key().0,
+                game_pk.x_only_public_key().0,
+                vec![],
+                server_info.unilateral_exit_delay,
+                server_info.network,
+            )?;
+            
+            game_addresses.push(GameArkAddress {
+                multiplier,
+                vtxo: game_vtxo,
+                secret_key: game_sk,
+            });
+        }
+
         Ok(Self {
             grpc_client,
             esplora_client,
             server_info,
             main_address: (main_vtxo, main_sk),
-            game_addresses: vec![
-                GameArkAddress {
-                    multiplier: Multiplier::X15,
-                    vtxo: seed_1_5x_vtxo,
-                    secret_key: seed_1_5x_sk,
-                },
-                GameArkAddress {
-                    multiplier: Multiplier::X2,
-                    vtxo: seed_2x_pk_vtxo,
-                    secret_key: seed_2x_sk,
-                },
-            ],
+            game_addresses,
             boarding_output,
             secp,
         })
@@ -823,20 +826,6 @@ struct GameArkAddress {
     secret_key: SecretKey,
 }
 
-#[derive(Debug, Clone, Copy)]
-pub enum Multiplier {
-    X15,
-    X2,
-}
-
-impl Display for Multiplier {
-    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
-        match self {
-            Multiplier::X15 => write!(f, "X15"),
-            Multiplier::X2 => write!(f, "X2"),
-        }
-    }
-}
 
 async fn get_address_from_output(
     script: &bitcoin::ScriptBuf,
