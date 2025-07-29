@@ -23,6 +23,7 @@ pub struct GameResult {
     pub is_winner: bool,
     pub payment_successful: bool,
     pub timestamp: OffsetDateTime,
+    pub multiplier: i64,
 }
 
 #[derive(Debug, sqlx::FromRow)]
@@ -97,15 +98,16 @@ pub async fn insert_game_result(
     player_address: &str,
     is_winner: bool,
     payment_successful: bool,
+    multiplier: i64,
 ) -> Result<i64, sqlx::Error> {
     let result = sqlx::query!(
         r#"
         INSERT INTO game_results (
             nonce, rolled_number, input_tx_id, output_tx_id,
             bet_amount, winning_amount, player_address,
-            is_winner, payment_successful
+            is_winner, payment_successful, multiplier
         )
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         "#,
         nonce,
         rolled_number,
@@ -115,7 +117,8 @@ pub async fn insert_game_result(
         winning_amount,
         player_address,
         is_winner,
-        payment_successful
+        payment_successful,
+        multiplier
     )
     .execute(pool)
     .await?;

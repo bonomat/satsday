@@ -173,6 +173,7 @@ impl TransactionProcessor {
                             &sender,
                             true,
                             true,
+                            multiplier.multiplier() as i64,
                         )
                         .await
                         {
@@ -194,6 +195,7 @@ impl TransactionProcessor {
                             &sender,
                             true,
                             false,
+                            multiplier.multiplier() as i64,
                         )
                         .await
                         {
@@ -222,6 +224,7 @@ impl TransactionProcessor {
                     &sender,
                     false,
                     true, // No payment needed for losses
+                    multiplier.multiplier() as i64,
                 )
                 .await
                 {

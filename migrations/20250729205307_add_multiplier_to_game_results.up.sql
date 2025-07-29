@@ -1,0 +1,1 @@
+ALTER TABLE game_results ADD COLUMN multiplier INTEGER NOT NULL DEFAULT 180;
