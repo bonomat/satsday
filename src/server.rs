@@ -1,10 +1,12 @@
 use anyhow::Result;
+use axum::http::Method;
 use axum::{Router, extract::State, http::StatusCode, response::Json, routing::get};
 use serde::Serialize;
 use serde_json::{Value, json};
 use sqlx::{Pool, Sqlite};
 use std::sync::Arc;
 use tokio::net::TcpListener;
+use tower_http::cors::CorsLayer;
 
 use crate::{
     ArkClient, nonce_service::spawn_nonce_service, transaction_processor::spawn_transaction_monitor,
@@ -41,10 +43,27 @@ pub async fn start_server(ark_client: ArkClient, port: u16, pool: Pool<Sqlite>) 
     spawn_transaction_monitor(ark_client_arc, my_addresses, 10, nonce_service, pool).await;
     println!("🔍 Transaction monitoring started (checking every 10 seconds)");
 
+    let cors = CorsLayer::new()
+        .allow_origin(
+            "http://localhost:12346"
+                .parse::<axum::http::HeaderValue>()
+                .unwrap(),
+        )
+        .allow_methods(vec![Method::GET, Method::POST, Method::PUT, Method::DELETE])
+        .allow_headers(vec![
+            axum::http::header::ORIGIN,
+            axum::http::header::AUTHORIZATION,
+            axum::http::header::ACCEPT,
+            axum::http::header::ACCESS_CONTROL_ALLOW_HEADERS,
+            axum::http::header::ACCESS_CONTROL_ALLOW_ORIGIN,
+            axum::http::header::CONTENT_TYPE,
+        ]);
+
     let app = Router::new()
         .route("/address", get(get_address))
         .route("/boarding-address", get(get_boarding_address))
         .route("/game-addresses", get(get_game_addresses))
+        .layer(cors)
         .with_state(state);
 
     let addr = format!("0.0.0.0:{port}");
