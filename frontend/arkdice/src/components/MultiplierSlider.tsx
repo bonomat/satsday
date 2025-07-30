@@ -56,7 +56,7 @@ const MultiplierSlider = ({
   const handleSliderChange = (value: number[]) => {
     setSliderValue(value[0]);
   };
-  
+
   // Calculate position percentage for visual elements
   const getPositionPercentage = (index: number) => {
     return (index / (multiplierOptions.length - 1)) * 100;
@@ -66,21 +66,21 @@ const MultiplierSlider = ({
     <div className="w-full max-w-4xl mx-auto bg-gray-800 p-8 rounded-xl border border-gray-700">
       <div className="relative mb-4">
         {/* Multiplier display above thumb */}
-        <motion.div
-          className="absolute -top-14 left-0 bg-orange-600 px-4 py-2 rounded-lg text-white font-bold shadow-xl"
-          style={{
-            left: `calc(${getPositionPercentage(sliderValue)}% - 2.5rem)`,
-          }}
-          animate={{
-            x: 0,
-            opacity: 1,
-          }}
-          initial={{ opacity: 0.8 }}
-          transition={{ type: "spring", stiffness: 300, damping: 20 }}
-        >
-          <div className="text-lg">{displayMultiplier < 10 ? displayMultiplier.toFixed(2) : displayMultiplier}x</div>
-          <div className="text-xs opacity-90">Win: {((1 / displayMultiplier) * 98.1).toFixed(1)}%</div>
-        </motion.div>
+        {/*<motion.div*/}
+        {/*  className="absolute -top-14 left-0 bg-orange-600 px-4 py-2 rounded-lg text-white font-bold shadow-xl"*/}
+        {/*  style={{*/}
+        {/*    left: `calc(${getPositionPercentage(sliderValue)}% - 2.5rem)`,*/}
+        {/*  }}*/}
+        {/*  animate={{*/}
+        {/*    x: 0,*/}
+        {/*    opacity: 1,*/}
+        {/*  }}*/}
+        {/*  initial={{ opacity: 0.8 }}*/}
+        {/*  transition={{ type: "spring", stiffness: 300, damping: 20 }}*/}
+        {/*>*/}
+        {/*  <div className="text-lg">{displayMultiplier < 10 ? displayMultiplier.toFixed(2) : displayMultiplier}x</div>*/}
+        {/*  <div className="text-xs opacity-90">Win: {((1 / displayMultiplier) * 98.1).toFixed(1)}%</div>*/}
+        {/*</motion.div>*/}
 
         {/* Slider track with gradient */}
         <div className="h-2 w-full bg-gray-800 rounded-full overflow-hidden mb-1">
