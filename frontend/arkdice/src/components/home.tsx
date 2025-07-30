@@ -159,7 +159,7 @@ const Home = () => {
       <div className="max-w-7xl mx-auto p-6">
         <header className="mb-8 text-center">
           <h1 className="text-4xl font-bold text-orange-500 mb-2">
-            Satoshi Dice Slider
+            Select Your Odds & Win Multiplier
           </h1>
           <p className="text-gray-400">
             Send sats to the address below. If the rolled number is less than{" "}

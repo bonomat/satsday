@@ -11,33 +11,26 @@ const MultiplierSlider = ({
   onChange = () => {},
   value = 2,
 }: MultiplierSliderProps) => {
-  // Convert multiplier to slider value (0-100)
+  // Available multiplier options from the game
+  const multiplierOptions = [1.05, 1.1, 1.33, 1.5, 2, 3, 10, 25, 50, 100, 1000];
+  
+  // Convert multiplier to slider value (0-10 for 11 options)
   const multiplierToSliderValue = (multiplier: number): number => {
-    // Logarithmic scale for better usability
-    const min = Math.log(1.05);
-    const max = Math.log(1000);
-    const normalized = (Math.log(multiplier) - min) / (max - min);
-    return normalized * 100;
+    const index = multiplierOptions.findIndex(m => Math.abs(m - multiplier) < 0.01);
+    return index >= 0 ? index : 4; // Default to 2x if not found
   };
 
-  // Convert slider value (0-100) to multiplier
+  // Convert slider value to multiplier
   const sliderValueToMultiplier = (value: number): number => {
-    const min = Math.log(1.05);
-    const max = Math.log(1000);
-    const scaled = min + (value / 100) * (max - min);
-    return Math.exp(scaled);
+    const index = Math.round(value);
+    return multiplierOptions[index] || 2;
   };
-
-  // Common multiplier snap points (based on actual game options)
-  const snapPoints = [1.05, 1.1, 1.33, 1.5, 2, 3, 10, 25, 50, 100, 1000];
-  const snapPointValues = snapPoints.map(multiplierToSliderValue);
 
   const [sliderValue, setSliderValue] = useState<number>(
     multiplierToSliderValue(value),
   );
   const [displayMultiplier, setDisplayMultiplier] =
     useState<number>(value);
-  const [isSnapping, setIsSnapping] = useState<boolean>(false);
 
   // Update slider when value prop changes
   useEffect(() => {
@@ -45,60 +38,38 @@ const MultiplierSlider = ({
     setDisplayMultiplier(value);
   }, [value]);
 
-  // Check if we should snap to a common multiplier
+  // Update multiplier when slider changes
   useEffect(() => {
-    if (isSnapping) return;
-
     const currentMultiplier = sliderValueToMultiplier(sliderValue);
+    setDisplayMultiplier(currentMultiplier);
+    onChange(currentMultiplier);
+  }, [sliderValue, onChange]);
 
-    // Find closest snap point if we're close enough
-    const snapThreshold = 3; // Adjust sensitivity as needed
-    let closestSnapPoint = null;
-    let minDistance = Infinity;
-
-    for (const point of snapPointValues) {
-      const distance = Math.abs(sliderValue - point);
-      if (distance < minDistance && distance < snapThreshold) {
-        minDistance = distance;
-        closestSnapPoint = point;
-      }
-    }
-
-    if (closestSnapPoint !== null) {
-      setIsSnapping(true);
-      setSliderValue(closestSnapPoint);
-      const snappedMultiplier = sliderValueToMultiplier(closestSnapPoint);
-      setDisplayMultiplier(snappedMultiplier);
-      onChange(snappedMultiplier);
-      setTimeout(() => setIsSnapping(false), 300);
-    } else {
-      setDisplayMultiplier(currentMultiplier);
-      onChange(currentMultiplier);
-    }
-  }, [sliderValue]);
-
-  // Get color based on multiplier value
+  // Get color based on slider position
   const getGradientColor = () => {
-    const percentage = sliderValue / 100;
+    const percentage = sliderValue / (multiplierOptions.length - 1);
     if (percentage < 0.33) return "from-green-500 to-yellow-500";
     if (percentage < 0.66) return "from-yellow-500 to-orange-500";
     return "from-orange-500 to-red-500";
   };
 
   const handleSliderChange = (value: number[]) => {
-    if (!isSnapping) {
-      setSliderValue(value[0]);
-    }
+    setSliderValue(value[0]);
+  };
+  
+  // Calculate position percentage for visual elements
+  const getPositionPercentage = (index: number) => {
+    return (index / (multiplierOptions.length - 1)) * 100;
   };
 
   return (
-    <div className="w-full max-w-4xl mx-auto bg-gray-900 p-6 rounded-xl">
-      <div className="relative mb-10">
+    <div className="w-full max-w-4xl mx-auto bg-gray-800 p-8 rounded-xl border border-gray-700">
+      <div className="relative mb-4">
         {/* Multiplier display above thumb */}
         <motion.div
-          className="absolute -top-12 left-0 bg-gray-800 px-3 py-1 rounded-md text-white font-bold border border-gray-700 shadow-lg"
+          className="absolute -top-14 left-0 bg-orange-600 px-4 py-2 rounded-lg text-white font-bold shadow-xl"
           style={{
-            left: `calc(${sliderValue}% - 2rem)`,
+            left: `calc(${getPositionPercentage(sliderValue)}% - 2.5rem)`,
           }}
           animate={{
             x: 0,
@@ -107,40 +78,45 @@ const MultiplierSlider = ({
           initial={{ opacity: 0.8 }}
           transition={{ type: "spring", stiffness: 300, damping: 20 }}
         >
-          {displayMultiplier.toFixed(displayMultiplier < 10 ? 2 : 1)}x
+          <div className="text-lg">{displayMultiplier < 10 ? displayMultiplier.toFixed(2) : displayMultiplier}x</div>
+          <div className="text-xs opacity-90">Win: {((1 / displayMultiplier) * 98.1).toFixed(1)}%</div>
         </motion.div>
 
         {/* Slider track with gradient */}
         <div className="h-2 w-full bg-gray-800 rounded-full overflow-hidden mb-1">
           <div
             className={`h-full rounded-full bg-gradient-to-r ${getGradientColor()}`}
-            style={{ width: `${sliderValue}%` }}
+            style={{ width: `${getPositionPercentage(sliderValue)}%` }}
           />
         </div>
 
         {/* Slider component */}
         <Slider
-          defaultValue={[sliderValue]}
           value={[sliderValue]}
-          max={100}
-          step={0.1}
+          max={multiplierOptions.length - 1}
+          step={1}
           onValueChange={handleSliderChange}
           className="mt-2"
         />
 
-        {/* Snap points indicators */}
-        <div className="relative h-6 mt-1">
-          {snapPoints.map((point, index) => {
-            const position = multiplierToSliderValue(point);
-            return (
-              <div
-                key={index}
-                className="absolute w-1 h-3 bg-gray-600 rounded-full"
-                style={{ left: `calc(${position}% - 1px)` }}
-                title={`${point}x`}
-              />
-            );
-          })}
+        {/* Tick marks with labels */}
+        <div className="relative h-16 mt-4">
+          {multiplierOptions.map((multiplier, index) => (
+            <div
+              key={index}
+              className="absolute flex flex-col items-center"
+              style={{ left: `${getPositionPercentage(index)}%`, transform: 'translateX(-50%)' }}
+            >
+              <div className="w-1 h-3 bg-gray-600 rounded-full" />
+              <span className="text-xs text-gray-400 mt-2 whitespace-nowrap font-medium">
+                {multiplier < 10 ? multiplier.toFixed(2) : multiplier}x
+              </span>
+              {/* Win probability */}
+              <span className="text-[10px] text-gray-500 mt-0.5">
+                {((1 / multiplier) * 98.1).toFixed(1)}%
+              </span>
+            </div>
+          ))}
         </div>
       </div>
 
