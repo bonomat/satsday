@@ -1,11 +1,10 @@
 import { useState, useEffect } from "react";
 import { Card, CardContent } from "@/components/ui/card";
 import { Separator } from "@/components/ui/separator";
-import { Button } from "@/components/ui/button";
-import { Shield, HelpCircle, Home as HomeIcon } from "lucide-react";
 import MultiplierSlider from "./MultiplierSlider";
 import BitcoinAddressSection from "./BitcoinAddressSection";
 import ActivityFeed from "./ActivityFeed";
+import Navbar from "./Navbar";
 import { gameService } from "@/services/gameService";
 import { type GameData, type GameAddress } from "@/types/game";
 
@@ -27,7 +26,7 @@ const InfoDisplay = ({
       <Card className="bg-gray-800 border-gray-700">
         <CardContent className="p-4 flex flex-col items-center justify-center">
           <h3 className="text-gray-400 text-sm mb-1">Win Probability</h3>
-          <p className="text-3xl font-bold text-green-500">{winProbability}%</p>
+          <p className="text-3xl font-bold text-green-500">{winProbability.toFixed(2)}%</p>
         </CardContent>
       </Card>
 
@@ -155,27 +154,7 @@ const Home = () => {
 
   return (
     <div className="min-h-screen bg-gray-900 text-white">
-      {/* Navigation Bar */}
-      <nav className="bg-gray-800 border-b border-gray-700 px-6 py-4">
-        <div className="max-w-7xl mx-auto flex items-center justify-between">
-          <div className="flex items-center space-x-2">
-            <HomeIcon className="h-6 w-6 text-orange-500" />
-            <span className="text-xl font-bold text-orange-500">
-              ARK Dice
-            </span>
-          </div>
-          <div className="flex items-center space-x-4">
-            <Button variant="ghost" className="text-gray-300 hover:text-white">
-              <HelpCircle className="h-4 w-4 mr-2" />
-              FAQ
-            </Button>
-            <Button variant="ghost" className="text-gray-300 hover:text-white">
-              <Shield className="h-4 w-4 mr-2" />
-              Provably Fair
-            </Button>
-          </div>
-        </div>
-      </nav>
+      <Navbar />
 
       <div className="max-w-7xl mx-auto p-6">
         <header className="mb-8 text-center">

@@ -144,11 +144,6 @@ const MultiplierSlider = ({
         </div>
       </div>
 
-      {/* Min/Max labels */}
-      <div className="flex justify-between text-sm text-gray-400">
-        <div>1.05x</div>
-        <div>1000x</div>
-      </div>
     </div>
   );
 };
