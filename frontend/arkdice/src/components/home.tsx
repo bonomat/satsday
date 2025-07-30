@@ -1,0 +1,255 @@
+import { useState, useEffect } from "react";
+import { Card, CardContent } from "@/components/ui/card";
+import { Separator } from "@/components/ui/separator";
+import { Button } from "@/components/ui/button";
+import { Shield, HelpCircle, Home as HomeIcon } from "lucide-react";
+import MultiplierSlider from "./MultiplierSlider";
+import BitcoinAddressSection from "./BitcoinAddressSection";
+import ActivityFeed from "./ActivityFeed";
+import { gameService } from "@/services/gameService";
+import { type GameData, type GameAddress } from "@/types/game";
+
+// Create a local InfoDisplay component since the import is causing issues
+const InfoDisplay = ({
+  winProbability = 49.5,
+  multiplier = 2,
+}: {
+  winProbability: number;
+  multiplier: number;
+}) => {
+  // Calculate potential payout based on a sample bet amount
+  const sampleBetAmount = 0.01; // 0.01 ARK
+  const potentialPayout = sampleBetAmount * multiplier;
+  const maxBetAmount = (1 / multiplier).toFixed(3);
+
+  return (
+    <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+      <Card className="bg-gray-800 border-gray-700">
+        <CardContent className="p-4 flex flex-col items-center justify-center">
+          <h3 className="text-gray-400 text-sm mb-1">Win Probability</h3>
+          <p className="text-3xl font-bold text-green-500">{winProbability}%</p>
+        </CardContent>
+      </Card>
+
+      <Card className="bg-gray-800 border-gray-700">
+        <CardContent className="p-4 flex flex-col items-center justify-center">
+          <h3 className="text-gray-400 text-sm mb-1">Potential Payout</h3>
+          <p className="text-lg text-white">Send {sampleBetAmount} ARK</p>
+          <p className="text-xl font-bold text-orange-500">
+            → Receive {potentialPayout.toFixed(5)} ARK
+          </p>
+        </CardContent>
+      </Card>
+
+      <Card className="bg-gray-800 border-gray-700">
+        <CardContent className="p-4 flex flex-col items-center justify-center">
+          <h3 className="text-gray-400 text-sm mb-1">Maximum Bet</h3>
+          <p className="text-3xl font-bold text-blue-500">{maxBetAmount} ARK</p>
+        </CardContent>
+      </Card>
+    </div>
+  );
+};
+
+const Home = () => {
+  const [gameData, setGameData] = useState<GameData | null>(null);
+  const [selectedGame, setSelectedGame] = useState<GameAddress | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    const fetchData = async () => {
+      try {
+        const data = await gameService.fetchGameAddresses();
+        setGameData(data);
+        // Select the default game (2x multiplier)
+        const defaultGame = data.game_addresses.find(g => g.multiplier_value === 200) || data.game_addresses[4];
+        setSelectedGame(defaultGame);
+        setLoading(false);
+      } catch (err) {
+        console.error('Failed to fetch game data:', err);
+        setError('Failed to load game data');
+        setLoading(false);
+      }
+    };
+    fetchData();
+  }, []);
+
+  const handleMultiplierChange = (value: number) => {
+    if (!gameData) return;
+    
+    // Find the closest game option based on multiplier
+    const closestGame = gameData.game_addresses.reduce((prev, curr) => {
+      const prevDiff = Math.abs(prev.multiplier_value / 100 - value);
+      const currDiff = Math.abs(curr.multiplier_value / 100 - value);
+      return currDiff < prevDiff ? curr : prev;
+    });
+    
+    setSelectedGame(closestGame);
+  };
+
+  // Mock data for activity feed
+  const activityData = [
+    {
+      id: 1,
+      timeAgo: "2 mins ago",
+      amountSent: "0.015 ARK",
+      multiplier: "2.0x",
+      resultNumber: "42",
+      isWin: true,
+      payout: "0.03 ARK",
+    },
+    {
+      id: 2,
+      timeAgo: "5 mins ago",
+      amountSent: "0.01 ARK",
+      multiplier: "3.5x",
+      resultNumber: "78",
+      isWin: false,
+      payout: "0",
+    },
+    {
+      id: 3,
+      timeAgo: "10 mins ago",
+      amountSent: "0.005 ARK",
+      multiplier: "10x",
+      resultNumber: "8",
+      isWin: true,
+      payout: "0.05 ARK",
+    },
+    {
+      id: 4,
+      timeAgo: "15 mins ago",
+      amountSent: "0.02 ARK",
+      multiplier: "1.5x",
+      resultNumber: "92",
+      isWin: false,
+      payout: "0",
+    },
+    {
+      id: 5,
+      timeAgo: "20 mins ago",
+      amountSent: "0.008 ARK",
+      multiplier: "5x",
+      resultNumber: "12",
+      isWin: true,
+      payout: "0.04 ARK",
+    },
+  ];
+
+  if (loading) {
+    return (
+      <div className="min-h-screen bg-gray-900 flex items-center justify-center">
+        <div className="text-white text-xl">Loading game data...</div>
+      </div>
+    );
+  }
+
+  if (error || !gameData || !selectedGame) {
+    return (
+      <div className="min-h-screen bg-gray-900 flex items-center justify-center">
+        <div className="text-red-500 text-xl">{error || 'Failed to load game data'}</div>
+      </div>
+    );
+  }
+
+  return (
+    <div className="min-h-screen bg-gray-900 text-white">
+      {/* Navigation Bar */}
+      <nav className="bg-gray-800 border-b border-gray-700 px-6 py-4">
+        <div className="max-w-7xl mx-auto flex items-center justify-between">
+          <div className="flex items-center space-x-2">
+            <HomeIcon className="h-6 w-6 text-orange-500" />
+            <span className="text-xl font-bold text-orange-500">
+              ARK Dice
+            </span>
+          </div>
+          <div className="flex items-center space-x-4">
+            <Button variant="ghost" className="text-gray-300 hover:text-white">
+              <HelpCircle className="h-4 w-4 mr-2" />
+              FAQ
+            </Button>
+            <Button variant="ghost" className="text-gray-300 hover:text-white">
+              <Shield className="h-4 w-4 mr-2" />
+              Provably Fair
+            </Button>
+          </div>
+        </div>
+      </nav>
+
+      <div className="max-w-7xl mx-auto p-6">
+        <header className="mb-8 text-center">
+          <h1 className="text-4xl font-bold text-orange-500 mb-2">
+            ARK Dice Slider
+          </h1>
+          <p className="text-gray-400">
+            Send ARK to the address below. If the rolled number is less than{" "}
+            {selectedGame.max_roll.toLocaleString()}, you win {selectedGame.multiplier} your bet!
+          </p>
+        </header>
+
+        <div className="mb-8">
+          <MultiplierSlider
+            value={selectedGame.multiplier_value / 100}
+            onChange={handleMultiplierChange}
+          />
+        </div>
+
+        <div className="mb-8">
+          <InfoDisplay
+            winProbability={selectedGame.win_probability}
+            multiplier={selectedGame.multiplier_value / 100}
+          />
+        </div>
+
+        {/* Central Bitcoin Betting Section */}
+        <div className="mb-8 flex justify-center">
+          <Card className="bg-gray-800 border-gray-700 max-w-2xl w-full">
+            <CardContent className="p-6">
+              <h2 className="text-2xl font-semibold mb-4 text-orange-500 text-center">
+                Bet with sats
+              </h2>
+              <BitcoinAddressSection
+                multiplier={selectedGame.multiplier_value / 100}
+                targetNumber={selectedGame.max_roll}
+                address={selectedGame.address}
+              />
+
+              <div className="mt-6 p-4 bg-gray-700 rounded-lg">
+                <h3 className="text-lg font-medium mb-2">How It Works</h3>
+                <ul className="space-y-2 text-sm text-gray-300">
+                  <li>• Roll range: {gameData.info.roll_range}</li>
+                  <li>• Win if: {gameData.info.win_condition}</li>
+                  <li>• Target: Less than {selectedGame.max_roll.toLocaleString()}</li>
+                  <li>• Win probability: {selectedGame.win_probability.toFixed(2)}%</li>
+                  <li>• House edge: 1.9%</li>
+                </ul>
+              </div>
+            </CardContent>
+          </Card>
+        </div>
+
+        {/* Live Activity Section */}
+        <div className="flex justify-center">
+          <Card className="bg-gray-800 border-gray-700 max-w-2xl w-full">
+            <CardContent className="p-6">
+              <h2 className="text-2xl font-semibold mb-4 text-orange-500 text-center">
+                Live Activity
+              </h2>
+              <ActivityFeed activities={activityData} />
+            </CardContent>
+          </Card>
+        </div>
+
+        <footer className="mt-12 text-center text-gray-500 text-sm">
+          <Separator className="mb-6 bg-gray-700" />
+          <p>
+            Provably fair dice game • 1.9% house edge • Instant payouts
+          </p>
+        </footer>
+      </div>
+    </div>
+  );
+};
+
+export default Home;

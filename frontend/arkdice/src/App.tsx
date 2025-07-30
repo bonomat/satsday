@@ -1,8 +1,17 @@
-import './App.css'
-import { ArkDice } from './components/ArkDice'
+import {Suspense} from "react";
+import {Routes, Route} from "react-router-dom";
+import Home from "./components/home";
 
 function App() {
-    return <ArkDice />
+    return (
+        <Suspense fallback={<p>Loading...</p>}>
+            <>
+                <Routes>
+                    <Route path="/" element={<Home/>}/>
+                </Routes>
+            </>
+        </Suspense>
+    );
 }
 
-export default App
+export default App;
