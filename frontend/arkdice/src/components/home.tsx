@@ -17,9 +17,9 @@ const InfoDisplay = ({
   multiplier: number;
 }) => {
   // Calculate potential payout based on a sample bet amount
-  const sampleBetAmount = 0.01; // 0.01 ARK
+  const sampleBetAmount = 10000; // 10,000 sats
   const potentialPayout = sampleBetAmount * multiplier;
-  const maxBetAmount = (1 / multiplier).toFixed(3);
+  const maxBetAmount = Math.floor(500000 / multiplier);
 
   return (
     <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
@@ -33,9 +33,9 @@ const InfoDisplay = ({
       <Card className="bg-gray-800 border-gray-700">
         <CardContent className="p-4 flex flex-col items-center justify-center">
           <h3 className="text-gray-400 text-sm mb-1">Potential Payout</h3>
-          <p className="text-lg text-white">Send {sampleBetAmount} ARK</p>
+          <p className="text-lg text-white">Send {sampleBetAmount.toLocaleString()} sats</p>
           <p className="text-xl font-bold text-orange-500">
-            → Receive {potentialPayout.toFixed(5)} ARK
+            → Receive {Math.floor(potentialPayout).toLocaleString()} sats
           </p>
         </CardContent>
       </Card>
@@ -43,7 +43,7 @@ const InfoDisplay = ({
       <Card className="bg-gray-800 border-gray-700">
         <CardContent className="p-4 flex flex-col items-center justify-center">
           <h3 className="text-gray-400 text-sm mb-1">Maximum Bet</h3>
-          <p className="text-3xl font-bold text-blue-500">{maxBetAmount} ARK</p>
+          <p className="text-3xl font-bold text-blue-500">{maxBetAmount.toLocaleString()} sats</p>
         </CardContent>
       </Card>
     </div>
@@ -92,16 +92,16 @@ const Home = () => {
     {
       id: 1,
       timeAgo: "2 mins ago",
-      amountSent: "0.015 ARK",
+      amountSent: "15,000 sats",
       multiplier: "2.0x",
       resultNumber: "42",
       isWin: true,
-      payout: "0.03 ARK",
+      payout: "30,000 sats",
     },
     {
       id: 2,
       timeAgo: "5 mins ago",
-      amountSent: "0.01 ARK",
+      amountSent: "10,000 sats",
       multiplier: "3.5x",
       resultNumber: "78",
       isWin: false,
@@ -110,16 +110,16 @@ const Home = () => {
     {
       id: 3,
       timeAgo: "10 mins ago",
-      amountSent: "0.005 ARK",
+      amountSent: "5,000 sats",
       multiplier: "10x",
       resultNumber: "8",
       isWin: true,
-      payout: "0.05 ARK",
+      payout: "50,000 sats",
     },
     {
       id: 4,
       timeAgo: "15 mins ago",
-      amountSent: "0.02 ARK",
+      amountSent: "20,000 sats",
       multiplier: "1.5x",
       resultNumber: "92",
       isWin: false,
@@ -128,11 +128,11 @@ const Home = () => {
     {
       id: 5,
       timeAgo: "20 mins ago",
-      amountSent: "0.008 ARK",
+      amountSent: "8,000 sats",
       multiplier: "5x",
       resultNumber: "12",
       isWin: true,
-      payout: "0.04 ARK",
+      payout: "40,000 sats",
     },
   ];
 
@@ -159,10 +159,10 @@ const Home = () => {
       <div className="max-w-7xl mx-auto p-6">
         <header className="mb-8 text-center">
           <h1 className="text-4xl font-bold text-orange-500 mb-2">
-            ARK Dice Slider
+            Satoshi Dice Slider
           </h1>
           <p className="text-gray-400">
-            Send ARK to the address below. If the rolled number is less than{" "}
+            Send sats to the address below. If the rolled number is less than{" "}
             {selectedGame.max_roll.toLocaleString()}, you win {selectedGame.multiplier} your bet!
           </p>
         </header>
@@ -201,6 +201,7 @@ const Home = () => {
                   <li>• Win if: {gameData.info.win_condition}</li>
                   <li>• Target: Less than {selectedGame.max_roll.toLocaleString()}</li>
                   <li>• Win probability: {selectedGame.win_probability.toFixed(2)}%</li>
+                  <li>• Min bet: 500 sats • Max bet: 500,000 sats</li>
                   <li>• House edge: 1.9%</li>
                 </ul>
               </div>
@@ -223,7 +224,7 @@ const Home = () => {
         <footer className="mt-12 text-center text-gray-500 text-sm">
           <Separator className="mb-6 bg-gray-700" />
           <p>
-            Provably fair dice game • 1.9% house edge • Instant payouts
+            Provably fair Bitcoin dice • 1.9% house edge • Instant payouts
           </p>
         </footer>
       </div>

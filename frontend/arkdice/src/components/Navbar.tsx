@@ -8,7 +8,7 @@ const Navbar = () => {
         <div className="flex items-center space-x-2">
           <HomeIcon className="h-6 w-6 text-orange-500" />
           <span className="text-xl font-bold text-orange-500">
-            ARK Dice
+            Satoshi Dice
           </span>
         </div>
         <div className="flex items-center space-x-4">

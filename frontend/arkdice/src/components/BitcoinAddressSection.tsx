@@ -24,7 +24,7 @@ const BitcoinAddressSection = ({
   const [qrCodeUrl, setQrCodeUrl] = useState("");
 
   useEffect(() => {
-    // Generate QR code URL based on the ARK address
+    // Generate QR code URL based on the Bitcoin address
     // Using a public QR code generator service
     setQrCodeUrl(
       `https://api.qrserver.com/v1/create-qr-code/?size=200x200&data=${address}`,
@@ -40,7 +40,7 @@ const BitcoinAddressSection = ({
   return (
     <div className="w-full max-w-md mx-auto bg-background p-6 rounded-xl border border-border">
       <h2 className="text-xl font-bold mb-4 text-center">
-        Send ARK to Win
+        Send Sats to Win
       </h2>
 
       <Card className="mb-6">
@@ -116,11 +116,12 @@ const BitcoinAddressSection = ({
       {/* How It Works */}
       <div className="mt-4 text-sm text-muted-foreground">
         <p className="mb-2">
-          Send ARK to the address above. If the lucky number is less than{" "}
+          Send sats to the address above. If the lucky number is less than{" "}
           {targetNumber.toLocaleString()}, you win {multiplier.toFixed(2)}x your bet!
         </p>
         <ul className="list-disc list-inside space-y-1">
-          <li>Minimum bet: 0.001 ARK</li>
+          <li>Minimum bet: 500 sats</li>
+          <li>Maximum bet: 500,000 sats</li>
           <li>House edge: 1.9%</li>
           <li>1 confirmation required</li>
         </ul>
