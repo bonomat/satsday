@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import  { useState, useEffect } from "react";
 import { Copy, Check } from "lucide-react";
 import { Card, CardContent } from "./ui/card";
 import { Button } from "./ui/button";
@@ -119,12 +119,6 @@ const BitcoinAddressSection = ({
           Send sats to the address above. If the lucky number is less than{" "}
           {targetNumber.toLocaleString()}, you win {multiplier.toFixed(2)}x your bet!
         </p>
-        <ul className="list-disc list-inside space-y-1">
-          <li>Minimum bet: 500 sats</li>
-          <li>Maximum bet: 500,000 sats</li>
-          <li>House edge: 1.9%</li>
-          <li>1 confirmation required</li>
-        </ul>
       </div>
     </div>
   );

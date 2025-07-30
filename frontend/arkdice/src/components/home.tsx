@@ -209,7 +209,6 @@ const Home = () => {
                   <li>• Target: Less than {selectedGame.max_roll.toLocaleString()}</li>
                   <li>• Win probability: {selectedGame.win_probability.toFixed(2)}%</li>
                   <li>• Min bet: 500 sats • Max bet: 500,000 sats</li>
-                  <li>• House edge: 1.9%</li>
                 </ul>
               </div>
             </CardContent>
