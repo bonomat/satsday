@@ -22,7 +22,7 @@ const InfoDisplay = ({
   const maxBetAmount = Math.floor(500000 / multiplier);
 
   return (
-    <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+    <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
       <Card className="bg-gray-800 border-gray-700">
         <CardContent className="p-4 flex flex-col items-center justify-center">
           <h3 className="text-gray-400 text-sm mb-1">Win Probability</h3>
@@ -32,9 +32,16 @@ const InfoDisplay = ({
 
       <Card className="bg-gray-800 border-gray-700">
         <CardContent className="p-4 flex flex-col items-center justify-center">
+          <h3 className="text-gray-400 text-sm mb-1">Multiplier</h3>
+          <p className="text-3xl font-bold text-orange-500">{multiplier < 10 ? multiplier.toFixed(2) : multiplier}x</p>
+        </CardContent>
+      </Card>
+
+      <Card className="bg-gray-800 border-gray-700">
+        <CardContent className="p-4 flex flex-col items-center justify-center">
           <h3 className="text-gray-400 text-sm mb-1">Potential Payout</h3>
           <p className="text-lg text-white">Send {sampleBetAmount.toLocaleString()} sats</p>
-          <p className="text-xl font-bold text-orange-500">
+          <p className="text-xl font-bold text-yellow-500">
             → Receive {Math.floor(potentialPayout).toLocaleString()} sats
           </p>
         </CardContent>
