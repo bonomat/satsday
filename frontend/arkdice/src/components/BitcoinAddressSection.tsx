@@ -8,6 +8,7 @@ import {
   TooltipProvider,
   TooltipTrigger,
 } from "./ui/tooltip";
+import { BETTING_CONFIG } from "@/config/betting";
 
 interface BitcoinAddressSectionProps {
   multiplier: number;
@@ -119,6 +120,12 @@ const BitcoinAddressSection = ({
           Send sats to the address above. If the lucky number is less than{" "}
           {targetNumber.toLocaleString()}, you win {multiplier.toFixed(2)}x your bet!
         </p>
+        <ul className="list-disc list-inside space-y-1">
+          <li>Minimum bet: {BETTING_CONFIG.MIN_BET_SATS.toLocaleString()} sats</li>
+          <li>Maximum bet: {BETTING_CONFIG.MAX_BET_SATS.toLocaleString()} sats</li>
+          <li>House edge: 1.9%</li>
+          <li>1 confirmation required</li>
+        </ul>
       </div>
     </div>
   );

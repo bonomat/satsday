@@ -1,6 +1,6 @@
 import { type GameData } from '@/types/game';
 
-const API_BASE_URL = 'http://localhost:12345';
+const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:12345';
 
 export const gameService = {
   async fetchGameAddresses(): Promise<GameData> {

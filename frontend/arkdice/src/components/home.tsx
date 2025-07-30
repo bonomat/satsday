@@ -7,6 +7,7 @@ import ActivityFeed from "./ActivityFeed";
 import Navbar from "./Navbar";
 import { gameService } from "@/services/gameService";
 import { type GameData, type GameAddress } from "@/types/game";
+import { BETTING_CONFIG } from "@/config/betting";
 
 // Create a local InfoDisplay component since the import is causing issues
 const InfoDisplay = ({
@@ -19,7 +20,7 @@ const InfoDisplay = ({
   // Calculate potential payout based on a sample bet amount
   const sampleBetAmount = 10000; // 10,000 sats
   const potentialPayout = sampleBetAmount * multiplier;
-  const maxBetAmount = Math.floor(500000 / multiplier);
+  const maxBetAmount = Math.floor(BETTING_CONFIG.MAX_BET_SATS / multiplier);
 
   return (
     <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
@@ -208,7 +209,7 @@ const Home = () => {
                   <li>• Win if: {gameData.info.win_condition}</li>
                   <li>• Target: Less than {selectedGame.max_roll.toLocaleString()}</li>
                   <li>• Win probability: {selectedGame.win_probability.toFixed(2)}%</li>
-                  <li>• Min bet: 500 sats • Max bet: 500,000 sats</li>
+                  <li>• Min bet: {BETTING_CONFIG.MIN_BET_SATS.toLocaleString()} sats • Max bet: {BETTING_CONFIG.MAX_BET_SATS.toLocaleString()} sats</li>
                 </ul>
               </div>
             </CardContent>
