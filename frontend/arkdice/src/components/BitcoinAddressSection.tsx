@@ -40,10 +40,6 @@ const BitcoinAddressSection = ({
 
   return (
     <div className="w-full max-w-md mx-auto bg-background p-6 rounded-xl border border-border">
-      <h2 className="text-xl font-bold mb-4 text-center">
-        Send Sats to Win
-      </h2>
-
       <Card className="mb-6">
         <CardContent className="p-6 flex flex-col items-center">
           {/* QR Code */}
@@ -105,15 +101,6 @@ const BitcoinAddressSection = ({
         </CardContent>
       </Card>
 
-      {/* Multiplier Label */}
-      <div className="text-center text-sm text-muted-foreground">
-        <span className="font-semibold">{address.substring(0, 8)}...</span> -
-        <span className="text-orange-500 font-bold">
-          {multiplier.toFixed(2)}x
-        </span>{" "}
-        multiplier
-      </div>
-
       {/* How It Works */}
       <div className="mt-4 text-sm text-muted-foreground">
         <p className="mb-2">
@@ -123,8 +110,6 @@ const BitcoinAddressSection = ({
         <ul className="list-disc list-inside space-y-1">
           <li>Minimum bet: {BETTING_CONFIG.MIN_BET_SATS.toLocaleString()} sats</li>
           <li>Maximum bet: {BETTING_CONFIG.MAX_BET_SATS.toLocaleString()} sats</li>
-          <li>House edge: 1.9%</li>
-          <li>1 confirmation required</li>
         </ul>
       </div>
     </div>

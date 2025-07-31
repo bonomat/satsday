@@ -9,51 +9,24 @@ import { gameService } from "@/services/gameService";
 import { type GameData, type GameAddress } from "@/types/game";
 import { BETTING_CONFIG } from "@/config/betting";
 
-// Create a local InfoDisplay component since the import is causing issues
+// Create a local InfoDisplay component
 const InfoDisplay = ({
-  winProbability = 49.5,
   multiplier = 2,
 }: {
-  winProbability: number;
   multiplier: number;
 }) => {
   // Calculate potential payout based on a sample bet amount
   const sampleBetAmount = 10000; // 10,000 sats
   const potentialPayout = sampleBetAmount * multiplier;
-  const maxBetAmount = Math.floor(BETTING_CONFIG.MAX_BET_SATS / multiplier);
 
   return (
-    <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-      <Card className="bg-gray-800 border-gray-700">
-        <CardContent className="p-4 flex flex-col items-center justify-center">
-          <h3 className="text-gray-400 text-sm mb-1">Win Probability</h3>
-          <p className="text-3xl font-bold text-green-500">{winProbability.toFixed(2)}%</p>
-        </CardContent>
-      </Card>
-
-      <Card className="bg-gray-800 border-gray-700">
-        <CardContent className="p-4 flex flex-col items-center justify-center">
-          <h3 className="text-gray-400 text-sm mb-1">Multiplier</h3>
-          <p className="text-3xl font-bold text-orange-500">{multiplier < 10 ? multiplier.toFixed(2) : multiplier}x</p>
-        </CardContent>
-      </Card>
-
-      <Card className="bg-gray-800 border-gray-700">
-        <CardContent className="p-4 flex flex-col items-center justify-center">
-          <h3 className="text-gray-400 text-sm mb-1">Potential Payout</h3>
-          <p className="text-lg text-white">Send {sampleBetAmount.toLocaleString()} sats</p>
-          <p className="text-xl font-bold text-yellow-500">
-            → Receive {Math.floor(potentialPayout).toLocaleString()} sats
-          </p>
-        </CardContent>
-      </Card>
-
-      <Card className="bg-gray-800 border-gray-700">
-        <CardContent className="p-4 flex flex-col items-center justify-center">
-          <h3 className="text-gray-400 text-sm mb-1">Maximum Bet</h3>
-          <p className="text-3xl font-bold text-blue-500">{maxBetAmount.toLocaleString()} sats</p>
-        </CardContent>
-      </Card>
+    <div className="text-center">
+      <p className="text-xl text-white">
+        Send {sampleBetAmount.toLocaleString()} sats
+      </p>
+      <p className="text-3xl font-bold text-orange-500 mt-2">
+        → Potential Payout {Math.floor(potentialPayout).toLocaleString()} sats
+      </p>
     </div>
   );
 };
@@ -184,7 +157,6 @@ const Home = () => {
 
         <div className="mb-8">
           <InfoDisplay
-            winProbability={selectedGame.win_probability}
             multiplier={selectedGame.multiplier_value / 100}
           />
         </div>
@@ -193,9 +165,6 @@ const Home = () => {
         <div className="mb-8 flex justify-center">
           <Card className="bg-gray-800 border-gray-700 max-w-2xl w-full">
             <CardContent className="p-6">
-              <h2 className="text-2xl font-semibold mb-4 text-orange-500 text-center">
-                Bet with sats
-              </h2>
               <BitcoinAddressSection
                 multiplier={selectedGame.multiplier_value / 100}
                 targetNumber={selectedGame.max_roll}
