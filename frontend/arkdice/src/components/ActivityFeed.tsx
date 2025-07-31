@@ -1,4 +1,3 @@
-import { Card, CardContent, CardHeader, CardTitle } from "./ui/card";
 import { ScrollArea } from "./ui/scroll-area";
 import { Badge } from "./ui/badge";
 import { Separator } from "./ui/separator";
@@ -98,83 +97,79 @@ const ActivityFeed = ({ activities = [] }: ActivityFeedProps) => {
     activities.length > 0 ? activities : defaultActivities;
 
   return (
-    <Card className="w-full max-w-md bg-black border-zinc-800">
-      <CardHeader className="pb-2">
-        <CardTitle className="text-xl font-bold text-orange-500">
-          Recent Activity
-        </CardTitle>
-      </CardHeader>
-      <CardContent className="p-0">
-        <ScrollArea className="h-[400px] pr-4">
-          <div className="space-y-4 p-4">
-            {displayActivities.map((activity) => (
-              <div key={activity.id} className="space-y-2">
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center space-x-2">
-                    <Clock className="h-4 w-4 text-zinc-400" />
-                    <span className="text-sm text-zinc-400">
-                      {activity.timeAgo}
-                    </span>
-                  </div>
-                  <Badge
-                    variant={activity.isWin ? "default" : "destructive"}
-                    className={
-                      activity.isWin ? "bg-green-600 hover:bg-green-700" : ""
-                    }
-                  >
-                    {activity.isWin ? "WIN" : "LOSS"}
-                  </Badge>
+    <div className="w-full">
+      <h2 className="text-xl font-bold text-orange-500 mb-4">
+        Recent Activity
+      </h2>
+      <ScrollArea className="h-[400px]">
+        <div className="space-y-4 pr-4">
+          {displayActivities.map((activity) => (
+            <div key={activity.id} className="space-y-2">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center space-x-2">
+                  <Clock className="h-4 w-4 text-gray-400" />
+                  <span className="text-sm text-gray-400">
+                    {activity.timeAgo}
+                  </span>
                 </div>
-
-                <div className="flex justify-between items-center">
-                  <div>
-                    <p className="text-sm font-medium text-zinc-300">
-                      Sent:{" "}
-                      <span className="text-white">{activity.amountSent}</span>
-                    </p>
-                    <p className="text-sm font-medium text-zinc-300">
-                      Multiplier:{" "}
-                      <span className="text-white">{activity.multiplier}x</span>
-                    </p>
-                  </div>
-                  <div className="text-right">
-                    <p className="text-sm font-medium text-zinc-300">
-                      Result:{" "}
-                      <span className="text-white">
-                        {activity.resultNumber}
-                      </span>
-                    </p>
-                    <p className="text-sm font-medium text-zinc-300">
-                      Target:{" "}
-                      <span className="text-white">
-                        &lt; {activity.targetNumber}
-                      </span>
-                    </p>
-                  </div>
-                </div>
-
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center space-x-1">
-                    {activity.isWin ? (
-                      <ArrowUpRight className="h-4 w-4 text-green-500" />
-                    ) : (
-                      <ArrowDownRight className="h-4 w-4 text-red-500" />
-                    )}
-                    <span
-                      className={`text-sm font-medium ${activity.isWin ? "text-green-500" : "text-red-500"}`}
-                    >
-                      Payout: {activity.payout}
-                    </span>
-                  </div>
-                </div>
-
-                <Separator className="bg-zinc-800 mt-2" />
+                <Badge
+                  variant={activity.isWin ? "default" : "destructive"}
+                  className={
+                    activity.isWin ? "bg-green-600 hover:bg-green-700" : ""
+                  }
+                >
+                  {activity.isWin ? "WIN" : "LOSS"}
+                </Badge>
               </div>
-            ))}
-          </div>
-        </ScrollArea>
-      </CardContent>
-    </Card>
+
+              <div className="flex justify-between items-center">
+                <div>
+                  <p className="text-sm font-medium text-gray-300">
+                    Sent:{" "}
+                    <span className="text-white">{activity.amountSent}</span>
+                  </p>
+                  <p className="text-sm font-medium text-gray-300">
+                    Multiplier:{" "}
+                    <span className="text-white">{activity.multiplier}x</span>
+                  </p>
+                </div>
+                <div className="text-right">
+                  <p className="text-sm font-medium text-gray-300">
+                    Result:{" "}
+                    <span className="text-white">
+                      {activity.resultNumber}
+                    </span>
+                  </p>
+                  <p className="text-sm font-medium text-gray-300">
+                    Target:{" "}
+                    <span className="text-white">
+                      &lt; {activity.targetNumber}
+                    </span>
+                  </p>
+                </div>
+              </div>
+
+              <div className="flex items-center justify-between">
+                <div className="flex items-center space-x-1">
+                  {activity.isWin ? (
+                    <ArrowUpRight className="h-4 w-4 text-green-500" />
+                  ) : (
+                    <ArrowDownRight className="h-4 w-4 text-red-500" />
+                  )}
+                  <span
+                    className={`text-sm font-medium ${activity.isWin ? "text-green-500" : "text-red-500"}`}
+                  >
+                    Payout: {activity.payout}
+                  </span>
+                </div>
+              </div>
+
+              <Separator className="bg-gray-700 mt-2" />
+            </div>
+          ))}
+        </div>
+      </ScrollArea>
+    </div>
   );
 };
 

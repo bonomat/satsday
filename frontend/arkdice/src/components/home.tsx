@@ -189,9 +189,6 @@ const Home = () => {
         <div className="flex justify-center">
           <Card className="bg-gray-800 border-gray-700 max-w-2xl w-full">
             <CardContent className="p-6">
-              <h2 className="text-2xl font-semibold mb-4 text-orange-500 text-center">
-                Live Activity
-              </h2>
               <ActivityFeed activities={activityData} />
             </CardContent>
           </Card>
