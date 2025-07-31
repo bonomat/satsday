@@ -1,5 +1,8 @@
 set dotenv-load := true
 
+# Default config file
+CONFIG_FILE := env_var_or_default('CONFIG_FILE', 'local.config.toml')
+
 fmt:
     just fmt-dprint
 
@@ -22,22 +25,22 @@ db-revert-migration:
     sqlx migrate revert --source=./migrations
 
 run:
-    cargo run -- start -p 12345 --config local.config.toml
+    cargo run -- start -p 12345 --config {{ CONFIG_FILE }}
 
 run-mutinynet:
     cargo run -- --config mutinynet.config.toml start -p 12345
 
 balance:
-    cargo run -- balance
+    cargo run -- --config {{ CONFIG_FILE }} balance
 
 settle:
-    cargo run -- settle
+    cargo run -- --config {{ CONFIG_FILE }} settle
 
 address:
-    cargo run -- address
+    cargo run -- --config {{ CONFIG_FILE }} address
 
 game-addresses:
-    cargo run -- game-addresses
+    cargo run -- --config {{ CONFIG_FILE }} game-addresses
 
 send address amount:
-    cargo run -- send {{ address }} {{ amount }}
+    cargo run -- --config {{ CONFIG_FILE }} send {{ address }} {{ amount }}
