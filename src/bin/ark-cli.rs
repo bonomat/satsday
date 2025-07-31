@@ -10,7 +10,7 @@ static MIGRATOR: Migrator = sqlx::migrate!(); // defaults to "./migrations"
 #[command(name = "ark-cli")]
 #[command(about = "Simple ARK client CLI")]
 struct Cli {
-    #[arg(short, long, default_value = "ark.config.toml")]
+    #[arg(short, long, default_value = "local.config.toml")]
     config: String,
 
     #[command(subcommand)]

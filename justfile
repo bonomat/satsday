@@ -22,7 +22,10 @@ db-revert-migration:
     sqlx migrate revert --source=./migrations
 
 run:
-    cargo run -- start -p 12345
+    cargo run -- start -p 12345 --config local.config.toml
+
+run-mutinynet:
+    cargo run -- --config mutinynet.config.toml start -p 12345
 
 balance:
     cargo run -- balance
