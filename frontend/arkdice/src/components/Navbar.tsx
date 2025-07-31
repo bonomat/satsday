@@ -1,14 +1,18 @@
 import { Button } from "@/components/ui/button";
-import { Shield, HelpCircle, Home as HomeIcon } from "lucide-react";
+import { Shield, HelpCircle } from "lucide-react";
 
 const Navbar = () => {
   return (
     <nav className="bg-gray-800 border-b border-gray-700 px-6 py-4">
       <div className="max-w-7xl mx-auto flex items-center justify-between">
         <div className="flex items-center space-x-2">
-          <HomeIcon className="h-6 w-6 text-orange-500" />
+          <img 
+            src="/quinx-icon.png" 
+            alt="Quinx Logo" 
+            className="h-8 w-8"
+          />
           <span className="text-xl font-bold text-orange-500">
-            Satoshi Dice
+            quinx.me
           </span>
         </div>
         <div className="flex items-center space-x-4">

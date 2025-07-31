@@ -1,6 +1,5 @@
 import { useState, useEffect } from "react";
 import { Slider } from "@/components/ui/slider";
-import { motion } from "framer-motion";
 
 interface MultiplierSliderProps {
   onChange?: (multiplier: number) => void;

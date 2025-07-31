@@ -49,6 +49,11 @@ pub async fn start_server(ark_client: ArkClient, port: u16, pool: Pool<Sqlite>) 
                 .parse::<axum::http::HeaderValue>()
                 .unwrap(),
         )
+        .allow_origin(
+            "http://localhost:12347"
+                .parse::<axum::http::HeaderValue>()
+                .unwrap(),
+        )
         .allow_methods(vec![Method::GET, Method::POST, Method::PUT, Method::DELETE])
         .allow_headers(vec![
             axum::http::header::ORIGIN,
