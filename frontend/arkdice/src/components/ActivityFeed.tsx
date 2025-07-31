@@ -130,7 +130,7 @@ const ActivityFeed = ({ activities = [] }: ActivityFeedProps) => {
                   </p>
                   <p className="text-sm font-medium text-gray-300">
                     Multiplier:{" "}
-                    <span className="text-white">{activity.multiplier}x</span>
+                    <span className="text-white">{activity.multiplier}</span>
                   </p>
                 </div>
                 <div className="text-right">

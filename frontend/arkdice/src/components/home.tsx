@@ -16,7 +16,7 @@ const InfoDisplay = ({
   multiplier: number;
 }) => {
   // Calculate potential payout based on a sample bet amount
-  const sampleBetAmount = 10000; // 10,000 sats
+  const sampleBetAmount = 1000; // 1,000 sats
   const potentialPayout = sampleBetAmount * multiplier;
 
   return (
@@ -25,7 +25,7 @@ const InfoDisplay = ({
         Send {sampleBetAmount.toLocaleString()} sats
       </p>
       <p className="text-3xl font-bold text-orange-500 mt-2">
-        → Potential Payout {Math.floor(potentialPayout).toLocaleString()} sats
+        → Payout {Math.floor(potentialPayout).toLocaleString()} sats
       </p>
     </div>
   );
