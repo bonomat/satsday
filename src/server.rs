@@ -1,7 +1,7 @@
 use anyhow::Result;
 use axum::http::Method;
-use axum::{Router, extract::State, http::StatusCode, response::Json, routing::get};
-use serde::Serialize;
+use axum::{Router, extract::{State, Query}, http::StatusCode, response::Json, routing::get};
+use serde::{Serialize, Deserialize};
 use serde_json::{Value, json};
 use sqlx::{Pool, Sqlite};
 use std::sync::Arc;
@@ -10,11 +10,13 @@ use tower_http::cors::CorsLayer;
 
 use crate::{
     ArkClient, nonce_service::spawn_nonce_service, transaction_processor::spawn_transaction_monitor,
+    db::{get_game_results_paginated, get_total_game_count},
 };
 
 #[derive(Clone)]
 pub struct AppState {
     pub ark_client: Arc<ArkClient>,
+    pub pool: Pool<Sqlite>,
 }
 
 #[derive(Serialize)]
@@ -26,6 +28,37 @@ struct GameAddressInfo {
     win_probability: f64,
 }
 
+#[derive(Deserialize)]
+struct PaginationQuery {
+    page: Option<i64>,
+    page_size: Option<i64>,
+}
+
+#[derive(Serialize)]
+struct GameHistoryItem {
+    id: String,
+    time_ago: String,
+    amount_sent: String,
+    multiplier: f64,
+    result_number: i64,
+    target_number: i64,
+    is_win: bool,
+    payout: String,
+    input_tx_id: String,
+    output_tx_id: Option<String>,
+    nonce: String,
+    timestamp: String,
+}
+
+#[derive(Serialize)]
+struct GameHistoryResponse {
+    games: Vec<GameHistoryItem>,
+    total: i64,
+    page: i64,
+    page_size: i64,
+    total_pages: i64,
+}
+
 pub async fn start_server(ark_client: ArkClient, port: u16, pool: Pool<Sqlite>) -> Result<()> {
     let ark_client_arc = Arc::new(ark_client);
 
@@ -34,6 +67,7 @@ pub async fn start_server(ark_client: ArkClient, port: u16, pool: Pool<Sqlite>) 
 
     let state = AppState {
         ark_client: ark_client_arc.clone(),
+        pool: pool.clone(),
     };
 
     // Start nonce service (generate new nonce every 24 hours)
@@ -68,6 +102,7 @@ pub async fn start_server(ark_client: ArkClient, port: u16, pool: Pool<Sqlite>) 
         .route("/address", get(get_address))
         .route("/boarding-address", get(get_boarding_address))
         .route("/game-addresses", get(get_game_addresses))
+        .route("/games", get(get_games))
         .layer(cors)
         .with_state(state);
 
@@ -78,6 +113,7 @@ pub async fn start_server(ark_client: ArkClient, port: u16, pool: Pool<Sqlite>) 
     println!("📍 Address endpoint: http://{addr}/address");
     println!("🚢 Boarding address endpoint: http://{addr}/boarding-address");
     println!("🎮 Game addresses endpoint: http://{addr}/game-addresses");
+    println!("📊 Games history endpoint: http://{addr}/games");
 
     axum::serve(listener, app).await?;
 
@@ -125,4 +161,78 @@ async fn get_game_addresses(State(state): State<AppState>) -> Result<Json<Value>
             "win_condition": "rolled_number < max_roll"
         }
     })))
+}
+
+async fn get_games(
+    State(state): State<AppState>,
+    Query(params): Query<PaginationQuery>,
+) -> Result<Json<GameHistoryResponse>, StatusCode> {
+    let page = params.page.unwrap_or(1).max(1);
+    let page_size = params.page_size.unwrap_or(20).clamp(1, 100);
+
+    let games = get_game_results_paginated(&state.pool, page, page_size)
+        .await
+        .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
+
+    let total = get_total_game_count(&state.pool)
+        .await
+        .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
+
+    let total_pages = (total as f64 / page_size as f64).ceil() as i64;
+
+    let now = time::OffsetDateTime::now_utc();
+
+    let game_items: Vec<GameHistoryItem> = games
+        .into_iter()
+        .map(|game| {
+            let time_diff = now - game.timestamp;
+            let time_ago = format_time_ago(time_diff);
+
+            let target_number = (65536.0 * 1000.0 / game.multiplier as f64) as i64;
+
+            GameHistoryItem {
+                id: game.id.to_string(),
+                time_ago,
+                amount_sent: format!("{:.8} BTC", game.bet_amount as f64 / 100_000_000.0),
+                multiplier: game.multiplier as f64 / 1000.0,
+                result_number: game.rolled_number,
+                target_number,
+                is_win: game.is_winner,
+                payout: if game.is_winner {
+                    format!("{:.8} BTC", game.winning_amount.unwrap_or(0) as f64 / 100_000_000.0)
+                } else {
+                    "0 BTC".to_string()
+                },
+                input_tx_id: game.input_tx_id,
+                output_tx_id: game.output_tx_id,
+                nonce: game.nonce,
+                timestamp: game.timestamp.to_string(),
+            }
+        })
+        .collect();
+
+    Ok(Json(GameHistoryResponse {
+        games: game_items,
+        total,
+        page,
+        page_size,
+        total_pages,
+    }))
+}
+
+fn format_time_ago(duration: time::Duration) -> String {
+    let seconds = duration.whole_seconds();
+    
+    if seconds < 60 {
+        format!("{} sec ago", seconds)
+    } else if seconds < 3600 {
+        let minutes = seconds / 60;
+        format!("{} min ago", minutes)
+    } else if seconds < 86400 {
+        let hours = seconds / 3600;
+        format!("{} hour{} ago", hours, if hours == 1 { "" } else { "s" })
+    } else {
+        let days = seconds / 86400;
+        format!("{} day{} ago", days, if days == 1 { "" } else { "s" })
+    }
 }

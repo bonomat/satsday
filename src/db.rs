@@ -177,3 +177,42 @@ pub async fn is_own_transaction(pool: &Pool<Sqlite>, tx_id: &str) -> Result<bool
 
     Ok(result.count > 0)
 }
+
+pub async fn get_game_results_paginated(
+    pool: &Pool<Sqlite>,
+    page: i64,
+    page_size: i64,
+) -> Result<Vec<GameResult>, sqlx::Error> {
+    let offset = (page - 1) * page_size;
+    
+    let results = sqlx::query_as!(
+        GameResult,
+        r#"
+        SELECT id, nonce, rolled_number, input_tx_id, output_tx_id,
+               bet_amount, winning_amount, player_address, is_winner,
+               payment_successful, timestamp, multiplier
+        FROM game_results
+        ORDER BY timestamp DESC
+        LIMIT ? OFFSET ?
+        "#,
+        page_size,
+        offset
+    )
+    .fetch_all(pool)
+    .await?;
+
+    Ok(results)
+}
+
+pub async fn get_total_game_count(pool: &Pool<Sqlite>) -> Result<i64, sqlx::Error> {
+    let result = sqlx::query!(
+        r#"
+        SELECT COUNT(*) as count
+        FROM game_results
+        "#
+    )
+    .fetch_one(pool)
+    .await?;
+
+    Ok(result.count)
+}
