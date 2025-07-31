@@ -110,6 +110,7 @@ const BitcoinAddressSection = ({
         <ul className="list-disc list-inside space-y-1">
           <li>Minimum bet: {BETTING_CONFIG.MIN_BET_SATS.toLocaleString()} sats</li>
           <li>Maximum bet: {BETTING_CONFIG.MAX_BET_SATS.toLocaleString()} sats</li>
+          <li className="text-yellow-600">Amounts below min or above max are considered donations</li>
         </ul>
       </div>
     </div>
