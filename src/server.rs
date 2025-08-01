@@ -1,7 +1,13 @@
 use anyhow::Result;
 use axum::http::Method;
-use axum::{Router, extract::{State, Query}, http::StatusCode, response::Json, routing::get};
-use serde::{Serialize, Deserialize};
+use axum::{
+    Router,
+    extract::{Query, State},
+    http::StatusCode,
+    response::Json,
+    routing::get,
+};
+use serde::{Deserialize, Serialize};
 use serde_json::{Value, json};
 use sqlx::{Pool, Sqlite};
 use std::sync::Arc;
@@ -9,8 +15,10 @@ use tokio::net::TcpListener;
 use tower_http::cors::CorsLayer;
 
 use crate::{
-    ArkClient, nonce_service::spawn_nonce_service, transaction_processor::spawn_transaction_monitor,
+    ArkClient,
     db::{get_game_results_paginated, get_total_game_count},
+    nonce_service::spawn_nonce_service,
+    transaction_processor::spawn_transaction_monitor,
 };
 
 #[derive(Clone)]
@@ -85,6 +93,21 @@ pub async fn start_server(ark_client: ArkClient, port: u16, pool: Pool<Sqlite>) 
         )
         .allow_origin(
             "http://localhost:12347"
+                .parse::<axum::http::HeaderValue>()
+                .unwrap(),
+        )
+        .allow_origin(
+            "https://bade63f5.satsday-xyz-signet.pages.dev"
+                .parse::<axum::http::HeaderValue>()
+                .unwrap(),
+        )
+        .allow_origin(
+            "https://satsday.xyz"
+                .parse::<axum::http::HeaderValue>()
+                .unwrap(),
+        )
+        .allow_origin(
+            "https://signet.satsday.xyz"
                 .parse::<axum::http::HeaderValue>()
                 .unwrap(),
         )
@@ -199,7 +222,10 @@ async fn get_games(
                 target_number,
                 is_win: game.is_winner,
                 payout: if game.is_winner {
-                    format!("{:.8} BTC", game.winning_amount.unwrap_or(0) as f64 / 100_000_000.0)
+                    format!(
+                        "{:.8} BTC",
+                        game.winning_amount.unwrap_or(0) as f64 / 100_000_000.0
+                    )
                 } else {
                     "0 BTC".to_string()
                 },
@@ -222,7 +248,7 @@ async fn get_games(
 
 fn format_time_ago(duration: time::Duration) -> String {
     let seconds = duration.whole_seconds();
-    
+
     if seconds < 60 {
         format!("{} sec ago", seconds)
     } else if seconds < 3600 {
