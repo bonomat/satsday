@@ -45,3 +45,16 @@ game-addresses:
 
 send address amount:
     cargo run -- --config {{ CONFIG_FILE }} send {{ address }} {{ amount }}
+
+deploy-frontend:
+    #!/bin/bash
+    set -e  # Exit on any error
+    cd frontend/arkdice
+
+    echo "🚀 Starting deployment for satsday.xyz..."
+
+    # Build the frontend
+    echo "📦 Building frontend..."
+    npm run build
+
+    npx wrangler pages deploy dist/ --project-name=satsday-xyz-signet --branch main
