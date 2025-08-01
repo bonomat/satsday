@@ -110,6 +110,7 @@ pub async fn start_server(ark_client: ArkClient, port: u16, pool: Pool<Sqlite>) 
         .route("/game-addresses", get(get_game_addresses))
         .route("/games", get(get_games))
         .route("/version", get(get_version))
+        .route("/balance", get(get_balance))
         .layer(cors)
         .with_state(state);
 
@@ -121,7 +122,8 @@ pub async fn start_server(ark_client: ArkClient, port: u16, pool: Pool<Sqlite>) 
     println!("🚢 Boarding address endpoint: http://{addr}/boarding-address");
     println!("🎮 Game addresses endpoint: http://{addr}/game-addresses");
     println!("📊 Games history endpoint: http://{addr}/games");
-    println!("ℹ️  Version endpoint: http://{addr}/version");
+    println!("ℹ️ Version endpoint: http://{addr}/version");
+    println!("💰 Balance endpoint: http://{addr}/balance");
 
     axum::serve(listener, app).await?;
 
@@ -255,5 +257,25 @@ async fn get_version() -> Result<Json<Value>, StatusCode> {
     Ok(Json(json!({
         "git_hash": GIT_HASH,
         "build_timestamp": BUILD_TIMESTAMP
+    })))
+}
+
+async fn get_balance(State(state): State<AppState>) -> Result<Json<Value>, StatusCode> {
+    let balance = state
+        .ark_client
+        .get_balance()
+        .await
+        .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
+
+    Ok(Json(json!({
+        "offchain": {
+            "spendable": balance.offchain_spendable.to_sat(),
+            "expired": balance.offchain_expired.to_sat()
+        },
+        "boarding": {
+            "spendable": balance.boarding_spendable.to_sat(),
+            "expired": balance.boarding_expired.to_sat(),
+            "pending": balance.boarding_pending.to_sat()
+        }
     })))
 }
