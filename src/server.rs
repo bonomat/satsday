@@ -109,6 +109,7 @@ pub async fn start_server(ark_client: ArkClient, port: u16, pool: Pool<Sqlite>) 
         .route("/boarding-address", get(get_boarding_address))
         .route("/game-addresses", get(get_game_addresses))
         .route("/games", get(get_games))
+        .route("/version", get(get_version))
         .layer(cors)
         .with_state(state);
 
@@ -120,6 +121,7 @@ pub async fn start_server(ark_client: ArkClient, port: u16, pool: Pool<Sqlite>) 
     println!("🚢 Boarding address endpoint: http://{addr}/boarding-address");
     println!("🎮 Game addresses endpoint: http://{addr}/game-addresses");
     println!("📊 Games history endpoint: http://{addr}/games");
+    println!("ℹ️  Version endpoint: http://{addr}/version");
 
     axum::serve(listener, app).await?;
 
@@ -244,4 +246,14 @@ fn format_time_ago(duration: time::Duration) -> String {
         let days = seconds / 86400;
         format!("{} day{} ago", days, if days == 1 { "" } else { "s" })
     }
+}
+
+async fn get_version() -> Result<Json<Value>, StatusCode> {
+    const GIT_HASH: &str = env!("GIT_HASH");
+    const BUILD_TIMESTAMP: &str = env!("BUILD_TIMESTAMP");
+
+    Ok(Json(json!({
+        "git_hash": GIT_HASH,
+        "build_timestamp": BUILD_TIMESTAMP
+    })))
 }
