@@ -1,5 +1,5 @@
 use anyhow::Result;
-use axum::http::Method;
+use axum::http::{HeaderValue, Method};
 use axum::{
     Router,
     extract::{Query, State},
@@ -86,31 +86,7 @@ pub async fn start_server(ark_client: ArkClient, port: u16, pool: Pool<Sqlite>) 
     println!("🔍 Transaction monitoring started (checking every 10 seconds)");
 
     let cors = CorsLayer::new()
-        .allow_origin(
-            "http://localhost:12346"
-                .parse::<axum::http::HeaderValue>()
-                .unwrap(),
-        )
-        .allow_origin(
-            "http://localhost:12347"
-                .parse::<axum::http::HeaderValue>()
-                .unwrap(),
-        )
-        .allow_origin(
-            "https://bade63f5.satsday-xyz-signet.pages.dev"
-                .parse::<axum::http::HeaderValue>()
-                .unwrap(),
-        )
-        .allow_origin(
-            "https://satsday.xyz"
-                .parse::<axum::http::HeaderValue>()
-                .unwrap(),
-        )
-        .allow_origin(
-            "https://signet.satsday.xyz"
-                .parse::<axum::http::HeaderValue>()
-                .unwrap(),
-        )
+        .allow_credentials(true)
         .allow_methods(vec![Method::GET, Method::POST, Method::PUT, Method::DELETE])
         .allow_headers(vec![
             axum::http::header::ORIGIN,
@@ -120,6 +96,13 @@ pub async fn start_server(ark_client: ArkClient, port: u16, pool: Pool<Sqlite>) 
             axum::http::header::ACCESS_CONTROL_ALLOW_ORIGIN,
             axum::http::header::CONTENT_TYPE,
         ]);
+
+    let cors = cors.allow_origin([
+        "http://localhost:12346".parse::<HeaderValue>()?,
+        "http://localhost:12347".parse::<HeaderValue>()?,
+        "https://satsday.xyz".parse::<HeaderValue>()?,
+        "https://signet.satsday.xyz".parse::<HeaderValue>()?,
+    ]);
 
     let app = Router::new()
         .route("/address", get(get_address))
