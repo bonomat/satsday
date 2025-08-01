@@ -68,55 +68,6 @@ const Home = () => {
     setSelectedGame(closestGame);
   };
 
-  // Mock data for activity feed
-  const activityData = [
-    {
-      id: 1,
-      timeAgo: "2 mins ago",
-      amountSent: "15,000 sats",
-      multiplier: "2.0x",
-      resultNumber: "42",
-      isWin: true,
-      payout: "30,000 sats",
-    },
-    {
-      id: 2,
-      timeAgo: "5 mins ago",
-      amountSent: "10,000 sats",
-      multiplier: "3.5x",
-      resultNumber: "78",
-      isWin: false,
-      payout: "0",
-    },
-    {
-      id: 3,
-      timeAgo: "10 mins ago",
-      amountSent: "5,000 sats",
-      multiplier: "10x",
-      resultNumber: "8",
-      isWin: true,
-      payout: "50,000 sats",
-    },
-    {
-      id: 4,
-      timeAgo: "15 mins ago",
-      amountSent: "20,000 sats",
-      multiplier: "1.5x",
-      resultNumber: "92",
-      isWin: false,
-      payout: "0",
-    },
-    {
-      id: 5,
-      timeAgo: "20 mins ago",
-      amountSent: "8,000 sats",
-      multiplier: "5x",
-      resultNumber: "12",
-      isWin: true,
-      payout: "40,000 sats",
-    },
-  ];
-
   if (loading) {
     return (
       <div className="min-h-screen bg-gray-900 flex items-center justify-center">
@@ -189,7 +140,7 @@ const Home = () => {
         <div className="flex justify-center">
           <Card className="bg-gray-800 border-gray-700 max-w-2xl w-full">
             <CardContent className="p-6">
-              <ActivityFeed activities={activityData} />
+              <ActivityFeed />
             </CardContent>
           </Card>
         </div>

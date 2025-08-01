@@ -28,6 +28,8 @@ const MultiplierSlider = ({
   const [sliderValue, setSliderValue] = useState<number>(
     multiplierToSliderValue(value),
   );
+
+  // @ts-ignore
   const [displayMultiplier, setDisplayMultiplier] =
     useState<number>(value);
 

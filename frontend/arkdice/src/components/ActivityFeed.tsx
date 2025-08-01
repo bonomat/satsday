@@ -3,7 +3,7 @@ import { Badge } from "./ui/badge";
 import { Separator } from "./ui/separator";
 import { Clock, ArrowUpRight, ArrowDownRight, ExternalLink, Copy, CheckCircle } from "lucide-react";
 import { useEffect, useState } from "react";
-import { fetchGameHistory, GameHistoryItem } from "@/services/api";
+import { fetchGameHistory, type GameHistoryItem } from "@/services/api";
 import { Button } from "./ui/button";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "./ui/tooltip";
 
