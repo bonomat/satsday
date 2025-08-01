@@ -18,18 +18,6 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "320119579fcad9c21884f5c4861d16174d0e06250625266f50fe6898340abefa"
 
 [[package]]
-name = "ahash"
-version = "0.8.12"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "5a15f179cd60c4584b8a8c596927aadc462e27f2ca70c04e0071964a73ba7a75"
-dependencies = [
- "cfg-if",
- "once_cell",
- "version_check",
- "zerocopy",
-]
-
-[[package]]
 name = "aho-corasick"
 version = "1.1.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -101,53 +89,9 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "e16d2d3311acee920a9eb8d33b8cbc1787ce4a264e85f964c2404b969bdcd487"
 
 [[package]]
-name = "ark-bdk-wallet"
-version = "0.7.0"
-dependencies = [
- "anyhow",
- "ark-client",
- "ark-core",
- "async-stream",
- "bdk_esplora 0.20.1",
- "bdk_wallet",
- "bitcoin",
- "esplora-client 0.11.0",
- "getrandom 0.2.16",
- "gloo-timers",
- "jiff 0.2.15",
- "tracing",
-]
-
-[[package]]
-name = "ark-client"
-version = "0.7.0"
-dependencies = [
- "ark-core",
- "ark-grpc",
- "ark-secp256k1",
- "async-stream",
- "backon",
- "base64 0.22.1",
- "bech32",
- "bitcoin",
- "futures",
- "getrandom 0.2.16",
- "gloo-timers",
- "jiff 0.2.15",
- "prost",
- "prost-types",
- "rand 0.8.5",
- "tokio",
- "tonic",
- "tonic-build",
- "tonic-web-wasm-client",
- "tracing",
- "wasm-bindgen-futures",
-]
-
-[[package]]
 name = "ark-core"
 version = "0.7.0"
+source = "git+https://github.com/arkade-os/rust-sdk.git?rev=1f905be#1f905beec7019c20567a518935de60a868fcee76"
 dependencies = [
  "ark-secp256k1",
  "bech32",
@@ -163,6 +107,7 @@ dependencies = [
 [[package]]
 name = "ark-grpc"
 version = "0.7.0"
+source = "git+https://github.com/arkade-os/rust-sdk.git?rev=1f905be#1f905beec7019c20567a518935de60a868fcee76"
 dependencies = [
  "ark-core",
  "ark-secp256k1",
@@ -181,6 +126,7 @@ dependencies = [
 [[package]]
 name = "ark-secp256k1"
 version = "0.31.0"
+source = "git+https://github.com/arkade-os/rust-sdk.git?rev=1f905be#1f905beec7019c20567a518935de60a868fcee76"
 dependencies = [
  "bitcoin_hashes",
  "rand 0.9.1",
@@ -464,17 +410,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "backon"
-version = "1.5.1"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "302eaff5357a264a2c42f127ecb8bac761cf99749fc3dc95677e2743991f99e7"
-dependencies = [
- "fastrand",
- "gloo-timers",
- "tokio",
-]
-
-[[package]]
 name = "backtrace"
 version = "0.3.75"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -516,78 +451,6 @@ name = "base64ct"
 version = "1.8.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "55248b47b0caf0546f7988906588779981c43bb1bc9d0c44087278f80cdb44ba"
-
-[[package]]
-name = "bdk_chain"
-version = "0.21.1"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "4955734f97b2baed3f36d16ae7c203fdde31ae85391ac44ee3cbcaf0886db5ce"
-dependencies = [
- "bdk_core 0.4.1",
- "bitcoin",
- "miniscript",
- "serde",
-]
-
-[[package]]
-name = "bdk_core"
-version = "0.3.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "be5e187ee33d5f99f1997a700cc1dfa0524fd1de31e6414c612c9e89ccdaa133"
-dependencies = [
- "bitcoin",
-]
-
-[[package]]
-name = "bdk_core"
-version = "0.4.1"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "b545aea1efc090e4f71f1dd5468090d9f54c3de48002064c04895ef811fbe0b2"
-dependencies = [
- "bitcoin",
- "hashbrown 0.14.5",
- "serde",
-]
-
-[[package]]
-name = "bdk_esplora"
-version = "0.19.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "bcae78230aedb46d07f7fa68e5082504111687d9df0e384c14dbf17d8cfa405a"
-dependencies = [
- "async-trait",
- "bdk_core 0.3.0",
- "esplora-client 0.10.0",
- "futures",
- "miniscript",
-]
-
-[[package]]
-name = "bdk_esplora"
-version = "0.20.1"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "3d7fdf5efbebabc0c0bb46c0348ef0d4db505856c7d6c5d50cebba1e5eda5fe4"
-dependencies = [
- "async-trait",
- "bdk_core 0.4.1",
- "esplora-client 0.11.0",
- "futures",
- "miniscript",
-]
-
-[[package]]
-name = "bdk_wallet"
-version = "1.2.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "461b92c4e47b688a92740b204f4580e0a51775df16b67dde1d2db6ede1f0ba09"
-dependencies = [
- "bdk_chain",
- "bitcoin",
- "miniscript",
- "rand_core 0.6.4",
- "serde",
- "serde_json",
-]
 
 [[package]]
 name = "bech32"
@@ -956,20 +819,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "esplora-client"
-version = "0.11.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "d0da3c186d286e046253ccdc4bb71aa87ef872e4eff2045947c0c4fe3d2b2efc"
-dependencies = [
- "bitcoin",
- "hex-conservative",
- "log",
- "reqwest",
- "serde",
- "tokio",
-]
-
-[[package]]
 name = "etcetera"
 version = "0.8.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1277,16 +1126,6 @@ name = "hashbrown"
 version = "0.12.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "8a9ee70c43aaf417c914396645a0fa852624801b24ebb7ae78fe8272889ac888"
-
-[[package]]
-name = "hashbrown"
-version = "0.14.5"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "e5274423e17b7c9fc20b6e7e208532f9b19825d82dfd615708b70edd83df41f1"
-dependencies = [
- "ahash",
- "serde",
-]
 
 [[package]]
 name = "hashbrown"
@@ -1694,61 +1533,6 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "4a5f13b858c8d314ee3e8f639011f7ccefe71f97f96e50151fb991f267928e2c"
 
 [[package]]
-name = "jiff"
-version = "0.1.29"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "c04ef77ae73f3cf50510712722f0c4e8b46f5aaa1bf5ffad2ae213e6495e78e5"
-dependencies = [
- "jiff-tzdb-platform",
- "log",
- "portable-atomic",
- "portable-atomic-util",
- "serde",
- "windows-sys 0.59.0",
-]
-
-[[package]]
-name = "jiff"
-version = "0.2.15"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "be1f93b8b1eb69c77f24bbb0afdf66f54b632ee39af40ca21c4365a1d7347e49"
-dependencies = [
- "jiff-static",
- "jiff-tzdb-platform",
- "log",
- "portable-atomic",
- "portable-atomic-util",
- "serde",
- "windows-sys 0.59.0",
-]
-
-[[package]]
-name = "jiff-static"
-version = "0.2.15"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "03343451ff899767262ec32146f6d559dd759fdadf42ff0e227c7c48f72594b4"
-dependencies = [
- "proc-macro2",
- "quote",
- "syn",
-]
-
-[[package]]
-name = "jiff-tzdb"
-version = "0.1.4"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "c1283705eb0a21404d2bfd6eef2a7593d240bc42a0bdb39db0ad6fa2ec026524"
-
-[[package]]
-name = "jiff-tzdb-platform"
-version = "0.1.3"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "875a5a69ac2bab1a891711cf5eccbec1ce0341ea805560dcd90b7a2e925132e8"
-dependencies = [
- "jiff-tzdb",
-]
-
-[[package]]
 name = "js-sys"
 version = "0.3.77"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1872,17 +1656,6 @@ name = "mime"
 version = "0.3.17"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "6877bb514081ee2a7ff5ef9de3281f14a4dd4bceac4c09388074a6b5df8a139a"
-
-[[package]]
-name = "miniscript"
-version = "12.3.4"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "a1eeb3bbebc87062b99fbb8c9067d30dab85469f4cf12248a2667777cc86b282"
-dependencies = [
- "bech32",
- "bitcoin",
- "serde",
-]
 
 [[package]]
 name = "miniz_oxide"
@@ -2213,21 +1986,6 @@ dependencies = [
  "rustix",
  "tracing",
  "windows-sys 0.59.0",
-]
-
-[[package]]
-name = "portable-atomic"
-version = "1.11.1"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "f84267b20a16ea918e43c6a88433c2d54fa145c92a811b5b047ccbe153674483"
-
-[[package]]
-name = "portable-atomic-util"
-version = "0.2.4"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "d8a2f0d8d040d7848a709caf78912debcc3f33ee4b3cac47d73d1e1069e83507"
-dependencies = [
- "portable-atomic",
 ]
 
 [[package]]
@@ -2650,19 +2408,14 @@ name = "satoshi_dice"
 version = "0.1.0"
 dependencies = [
  "anyhow",
- "ark-bdk-wallet",
  "ark-core",
  "ark-grpc",
  "axum 0.8.4",
- "base64 0.22.1",
- "bdk_esplora 0.19.0",
- "bdk_wallet",
  "bitcoin",
  "clap",
- "esplora-client 0.10.0",
+ "esplora-client",
  "futures",
  "hex",
- "jiff 0.1.29",
  "rand 0.8.5",
  "serde",
  "serde_json",
@@ -2725,6 +2478,7 @@ dependencies = [
 [[package]]
 name = "secp256k1-sys"
 version = "0.11.0"
+source = "git+https://github.com/arkade-os/rust-sdk.git?rev=1f905be#1f905beec7019c20567a518935de60a868fcee76"
 dependencies = [
  "cc",
 ]
@@ -3498,31 +3252,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "tonic-web-wasm-client"
-version = "0.6.2"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "8957be1a1c7aa12d4c9d67882060dd57aed816bbc553fa60949312e839f4a8ea"
-dependencies = [
- "base64 0.22.1",
- "byteorder",
- "bytes",
- "futures-util",
- "http 1.3.1",
- "http-body 1.0.1",
- "http-body-util",
- "httparse",
- "js-sys",
- "pin-project",
- "thiserror 1.0.69",
- "tonic",
- "tower-service",
- "wasm-bindgen",
- "wasm-bindgen-futures",
- "wasm-streams",
- "web-sys",
-]
-
-[[package]]
 name = "tower"
 version = "0.4.13"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -3850,19 +3579,6 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "1a05d73b933a847d6cccdda8f838a22ff101ad9bf93e33684f39c1f5f0eece3d"
 dependencies = [
  "unicode-ident",
-]
-
-[[package]]
-name = "wasm-streams"
-version = "0.4.2"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "15053d8d85c7eccdbefef60f06769760a563c7f0a9d6902a13d35c7800b0ad65"
-dependencies = [
- "futures-util",
- "js-sys",
- "wasm-bindgen",
- "wasm-bindgen-futures",
- "web-sys",
 ]
 
 [[package]]

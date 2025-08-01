@@ -1,6 +1,7 @@
 set dotenv-load := true
 
 # Default config file
+
 CONFIG_FILE := env_var_or_default('CONFIG_FILE', 'local.config.toml')
 
 fmt:
@@ -25,7 +26,7 @@ db-revert-migration:
     sqlx migrate revert --source=./migrations
 
 run:
-    cargo run -- start -p 12345 --config {{ CONFIG_FILE }}
+    cargo run -- --config {{ CONFIG_FILE }} start -p 12345
 
 run-mutinynet:
     cargo run -- --config mutinynet.config.toml start -p 12345
