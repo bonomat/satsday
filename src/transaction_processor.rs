@@ -182,25 +182,7 @@ impl TransactionProcessor {
                     }
                     Err(e) => {
                         tracing::error!("🚨 Failed to send payout: {}", e);
-
-                        // Store failed winning game result
-                        if let Err(e) = db::insert_game_result(
-                            &self.db_pool,
-                            &current_nonce.to_string(),
-                            rolled_number,
-                            &outpoint.outpoint.txid.to_string(),
-                            None,
-                            input_amount as i64,
-                            Some(payout as i64),
-                            &sender,
-                            true,
-                            false,
-                            multiplier.multiplier() as i64,
-                        )
-                        .await
-                        {
-                            tracing::error!("Failed to store game result: {}", e);
-                        }
+                        // Don't store the game result so it can be retried later
                     }
                 }
             } else {
