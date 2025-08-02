@@ -11,6 +11,7 @@ path = "src/bin/ark-cli.rs"
 anyhow = "1"
 ark-core = { git = "https://github.com/arkade-os/rust-sdk.git", rev = "1f905be" }
 ark-grpc = { git = "https://github.com/arkade-os/rust-sdk.git", rev = "1f905be" }
+atty = "0.2.14"
 axum = "0.8"
 bitcoin = { version = "0.32.4", features = ["rand"] }
 clap = { version = "4", features = ["derive"] }

@@ -1,0 +1,72 @@
+use anyhow::Context;
+use anyhow::Result;
+use time::macros::format_description;
+use tracing::metadata::LevelFilter;
+use tracing_subscriber::EnvFilter;
+use tracing_subscriber::Layer;
+use tracing_subscriber::filter::Directive;
+use tracing_subscriber::fmt::time::UtcTime;
+use tracing_subscriber::layer::SubscriberExt;
+use tracing_subscriber::util::SubscriberInitExt;
+
+const RUST_LOG_ENV: &str = "RUST_LOG";
+
+pub fn init_tracing(level: LevelFilter, json_format: bool) -> Result<()> {
+    if level == LevelFilter::OFF {
+        return Ok(());
+    }
+
+    let mut filter = EnvFilter::new("")
+        .add_directive("sqlx::query=warn".parse()?)
+        .add_directive("hyper_util=warn".parse()?)
+        .add_directive("h2=warn".parse()?)
+        .add_directive("rustls=warn".parse()?)
+        .add_directive("reqwest=warn".parse()?)
+        .add_directive("tower=warn".parse()?)
+        .add_directive("hyper=warn".parse()?)
+        .add_directive("notification-ws=off".parse()?)
+        // Used in our email client to render templates to text.
+        .add_directive("handlebars=warn".parse()?)
+        .add_directive(Directive::from(level));
+
+    // Parse additional log directives from env variable
+    let filter = match std::env::var_os(RUST_LOG_ENV).map(|s| s.into_string()) {
+        Some(Ok(env)) => {
+            for directive in env.split(',') {
+                #[allow(clippy::print_stdout)]
+                match directive.parse() {
+                    Ok(d) => filter = filter.add_directive(d),
+                    Err(e) => println!("WARN ignoring log directive: `{directive}`: {e}"),
+                };
+            }
+            filter
+        }
+        _ => filter,
+    };
+
+    let is_terminal = atty::is(atty::Stream::Stderr);
+
+    let fmt_layer = tracing_subscriber::fmt::layer()
+        .with_writer(std::io::stderr)
+        .with_ansi(is_terminal);
+
+    let fmt_layer = if json_format {
+        fmt_layer.json().with_timer(UtcTime::rfc_3339()).boxed()
+    } else {
+        fmt_layer
+            .with_timer(UtcTime::new(format_description!(
+                "[year]-[month]-[day] [hour]:[minute]:[second]"
+            )))
+            .boxed()
+    };
+
+    tracing_subscriber::registry()
+        .with(filter)
+        .with(fmt_layer)
+        .try_init()
+        .context("Failed to init tracing")?;
+
+    tracing::debug!("Initialized logger");
+
+    Ok(())
+}

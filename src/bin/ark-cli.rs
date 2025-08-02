@@ -1,8 +1,9 @@
 use anyhow::Result;
 use clap::Parser;
-use satoshi_dice::{ArkClient, Config, db, utils::init_tracing};
+use satoshi_dice::{ArkClient, Config, db, logger};
 use sqlx::migrate::Migrator;
 use sqlx::sqlite::SqlitePoolOptions;
+use tracing_subscriber::filter::LevelFilter;
 
 static MIGRATOR: Migrator = sqlx::migrate!(); // defaults to "./migrations"
 
@@ -36,7 +37,7 @@ enum Commands {
 
 #[tokio::main]
 async fn main() -> Result<()> {
-    init_tracing();
+    logger::init_tracing(LevelFilter::DEBUG, false)?;
 
     let cli = Cli::parse();
 
