@@ -8,6 +8,8 @@ use tokio::time::{Duration, sleep};
 
 use crate::key_derivation::Multiplier;
 use crate::{ArkClient, db, nonce_service::NonceService};
+use crate::websocket::SharedBroadcaster;
+use crate::server::GameHistoryItem;
 
 pub struct TransactionProcessor {
     ark_client: Arc<ArkClient>,
@@ -15,6 +17,7 @@ pub struct TransactionProcessor {
     check_interval: Duration,
     nonce_service: NonceService,
     db_pool: Pool<Sqlite>,
+    broadcaster: SharedBroadcaster,
 }
 
 impl TransactionProcessor {
@@ -24,6 +27,7 @@ impl TransactionProcessor {
         check_interval_seconds: u64,
         nonce_service: NonceService,
         db_pool: Pool<Sqlite>,
+        broadcaster: SharedBroadcaster,
     ) -> Self {
         Self {
             ark_client,
@@ -31,6 +35,7 @@ impl TransactionProcessor {
             check_interval: Duration::from_secs(check_interval_seconds),
             nonce_service,
             db_pool,
+            broadcaster,
         }
     }
 
@@ -84,6 +89,13 @@ impl TransactionProcessor {
         }
 
         Ok(())
+    }
+
+    async fn broadcast_game_result(&self, game: GameHistoryItem) {
+        let broadcaster = self.broadcaster.read().await;
+        if let Err(e) = broadcaster.broadcast_game_result(game) {
+            tracing::error!("Failed to broadcast game result: {}", e);
+        }
     }
 
     async fn process_spendable_outpoint(
@@ -162,7 +174,7 @@ impl TransactionProcessor {
                         }
 
                         // Store successful winning game result
-                        if let Err(e) = db::insert_game_result(
+                        let game_result = db::insert_game_result(
                             &self.db_pool,
                             &current_nonce.to_string(),
                             rolled_number,
@@ -175,9 +187,29 @@ impl TransactionProcessor {
                             true,
                             multiplier.multiplier() as i64,
                         )
-                        .await
-                        {
+                        .await;
+                        
+                        if let Err(e) = game_result {
                             tracing::error!("Failed to store game result: {}", e);
+                        } else {
+                            // Broadcast the game result
+                            let now = time::OffsetDateTime::now_utc();
+                            let game_item = GameHistoryItem {
+                                id: "latest".to_string(), // This will be replaced by actual ID from DB
+                                time_ago: "just now".to_string(),
+                                amount_sent: format!("{:.8} BTC", input_amount as f64 / 100_000_000.0),
+                                multiplier: multiplier.multiplier() as f64 / 1000.0,
+                                result_number: rolled_number,
+                                target_number: (65536.0 * 1000.0 / multiplier.multiplier() as f64) as i64,
+                                is_win: true,
+                                payout: format!("{:.8} BTC", payout as f64 / 100_000_000.0),
+                                input_tx_id: outpoint.outpoint.txid.to_string(),
+                                output_tx_id: Some(txid.to_string()),
+                                nonce: current_nonce.to_string(),
+                                timestamp: now.to_string(),
+                            };
+                            
+                            self.broadcast_game_result(game_item).await;
                         }
                     }
                     Err(e) => {
@@ -195,7 +227,7 @@ impl TransactionProcessor {
                 );
 
                 // Store losing game result
-                if let Err(e) = db::insert_game_result(
+                let game_result = db::insert_game_result(
                     &self.db_pool,
                     &current_nonce.to_string(),
                     rolled_number,
@@ -208,9 +240,29 @@ impl TransactionProcessor {
                     true, // No payment needed for losses
                     multiplier.multiplier() as i64,
                 )
-                .await
-                {
+                .await;
+                
+                if let Err(e) = game_result {
                     tracing::error!("Failed to store game result: {}", e);
+                } else {
+                    // Broadcast the game result
+                    let now = time::OffsetDateTime::now_utc();
+                    let game_item = GameHistoryItem {
+                        id: "latest".to_string(), // This will be replaced by actual ID from DB
+                        time_ago: "just now".to_string(),
+                        amount_sent: format!("{:.8} BTC", input_amount as f64 / 100_000_000.0),
+                        multiplier: multiplier.multiplier() as f64 / 1000.0,
+                        result_number: rolled_number,
+                        target_number: (65536.0 * 1000.0 / multiplier.multiplier() as f64) as i64,
+                        is_win: false,
+                        payout: "0 BTC".to_string(),
+                        input_tx_id: outpoint.outpoint.txid.to_string(),
+                        output_tx_id: None,
+                        nonce: current_nonce.to_string(),
+                        timestamp: now.to_string(),
+                    };
+                    
+                    self.broadcast_game_result(game_item).await;
                 }
             }
         }
@@ -225,6 +277,7 @@ pub async fn spawn_transaction_monitor(
     check_interval_seconds: u64,
     nonce_service: NonceService,
     db_pool: Pool<Sqlite>,
+    broadcaster: SharedBroadcaster,
 ) {
     let processor = TransactionProcessor::new(
         ark_client,
@@ -232,6 +285,7 @@ pub async fn spawn_transaction_monitor(
         check_interval_seconds,
         nonce_service,
         db_pool,
+        broadcaster,
     );
 
     tokio::spawn(async move {

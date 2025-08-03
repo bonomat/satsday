@@ -7,6 +7,7 @@ pub mod logger;
 pub mod nonce_service;
 pub mod server;
 pub mod transaction_processor;
+pub mod websocket;
 
 pub use client::ArkClient;
 pub use config::Config;
