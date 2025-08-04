@@ -49,7 +49,7 @@ send address amount:
 deploy-frontend:
     #!/bin/bash
     set -e  # Exit on any error
-    cd frontend/arkdice
+    cd frontend/satsday
 
     echo "🚀 Starting deployment for satsday.xyz..."
 
@@ -58,3 +58,9 @@ deploy-frontend:
     npm run build
 
     npx wrangler pages deploy dist/ --project-name=satsday-xyz-signet --branch main
+
+run-frontend:
+    #!/bin/bash
+    set -e  # Exit on any error
+    cd frontend/satsday
+    VITE_API_BASE_URL=http://localhost:12345 pnpm run dev
