@@ -4,6 +4,7 @@ use ark_core::server::VirtualTxOutPoint;
 use bitcoin::hashes::Hash;
 use sqlx::{Pool, Sqlite};
 use std::sync::Arc;
+use time;
 use tokio::time::{Duration, sleep};
 
 use crate::key_derivation::Multiplier;
@@ -67,6 +68,10 @@ impl TransactionProcessor {
                 match (is_tx_processed, is_own_tx) {
                     (Ok(false), Ok(false)) => {
                         tracing::debug!(tx_id, "Processing new transaction");
+                        
+                        // Broadcast pending game message immediately
+                        self.broadcast_pending_game(multiplier, outpoint).await;
+                        
                         self.process_spendable_outpoint(multiplier, outpoint)
                             .await?;
                     }
@@ -89,6 +94,32 @@ impl TransactionProcessor {
         }
 
         Ok(())
+    }
+
+    async fn broadcast_pending_game(&self, multiplier: &Multiplier, outpoint: &VirtualTxOutPoint) {
+        let current_nonce = self.nonce_service.get_current_nonce().await;
+        let input_amount = outpoint.amount.to_sat();
+        let now = time::OffsetDateTime::now_utc();
+        
+        let pending_game = GameHistoryItem {
+            id: format!("pending-{}", outpoint.outpoint.txid),
+            time_ago: "processing...".to_string(),
+            amount_sent: format!("{:.8} BTC", input_amount as f64 / 100_000_000.0),
+            multiplier: multiplier.multiplier() as f64 / 1000.0,
+            result_number: -1, // Indicates pending
+            target_number: (65536.0 * 1000.0 / multiplier.multiplier() as f64) as i64,
+            is_win: false, // Will be updated when processed
+            payout: "pending...".to_string(),
+            input_tx_id: outpoint.outpoint.txid.to_string(),
+            output_tx_id: None,
+            nonce: current_nonce.to_string(),
+            timestamp: now.to_string(),
+        };
+        
+        let broadcaster = self.broadcaster.read().await;
+        if let Err(e) = broadcaster.broadcast_game_result(pending_game) {
+            tracing::error!("Failed to broadcast pending game: {}", e);
+        }
     }
 
     async fn broadcast_game_result(&self, game: GameHistoryItem) {
