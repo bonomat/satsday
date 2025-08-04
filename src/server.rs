@@ -19,7 +19,7 @@ use crate::{
     db::{get_game_results_paginated, get_total_game_count},
     nonce_service::spawn_nonce_service,
     transaction_processor::spawn_transaction_monitor,
-    websocket::{WebSocketBroadcaster, SharedBroadcaster},
+    websocket::{SharedBroadcaster, WebSocketBroadcaster},
 };
 
 #[derive(Clone)]
@@ -88,7 +88,15 @@ pub async fn start_server(ark_client: ArkClient, port: u16, pool: Pool<Sqlite>) 
     let nonce_service = spawn_nonce_service(pool.clone(), 1, 1).await;
 
     // Start transaction monitoring in background
-    spawn_transaction_monitor(ark_client_arc, my_addresses, 10, nonce_service, pool, broadcaster).await;
+    spawn_transaction_monitor(
+        ark_client_arc,
+        my_addresses,
+        10,
+        nonce_service,
+        pool,
+        broadcaster,
+    )
+    .await;
     println!("🔍 Transaction monitoring started (checking every 10 seconds)");
 
     let cors = CorsLayer::new()
@@ -104,6 +112,7 @@ pub async fn start_server(ark_client: ArkClient, port: u16, pool: Pool<Sqlite>) 
         ]);
 
     let cors = cors.allow_origin([
+        "http://localhost:8080".parse::<HeaderValue>()?,
         "http://localhost:12346".parse::<HeaderValue>()?,
         "http://localhost:12347".parse::<HeaderValue>()?,
         "https://satsday.xyz".parse::<HeaderValue>()?,
@@ -288,19 +297,16 @@ async fn get_balance(State(state): State<AppState>) -> Result<Json<Value>, Statu
     })))
 }
 
-async fn websocket_handler(
-    ws: WebSocketUpgrade,
-    State(state): State<AppState>,
-) -> Response {
+async fn websocket_handler(ws: WebSocketUpgrade, State(state): State<AppState>) -> Response {
     ws.on_upgrade(|socket| handle_websocket(socket, state))
 }
 
 async fn handle_websocket(socket: axum::extract::ws::WebSocket, state: AppState) {
     use axum::extract::ws::Message;
-    use futures_util::{StreamExt, SinkExt};
-    
+    use futures_util::{SinkExt, StreamExt};
+
     let (mut sender, mut receiver) = socket.split();
-    
+
     // Send historical data first
     match get_game_results_paginated(&state.pool, 1, 20).await {
         Ok(games) => {
@@ -341,7 +347,7 @@ async fn handle_websocket(socket: axum::extract::ws::WebSocket, state: AppState)
                 "type": "history",
                 "games": game_items
             });
-            
+
             if let Ok(msg_str) = serde_json::to_string(&history_msg) {
                 let _ = sender.send(Message::Text(msg_str.into())).await;
             }
@@ -350,13 +356,13 @@ async fn handle_websocket(socket: axum::extract::ws::WebSocket, state: AppState)
             tracing::error!("Failed to get game history: {}", e);
         }
     }
-    
+
     // Subscribe to real-time updates
     let mut rx = {
         let broadcaster = state.broadcaster.read().await;
         broadcaster.subscribe()
     };
-    
+
     // Spawn task to handle incoming messages (ping/pong)
     tokio::spawn(async move {
         while let Some(Ok(msg)) = receiver.next().await {
@@ -372,13 +378,13 @@ async fn handle_websocket(socket: axum::extract::ws::WebSocket, state: AppState)
             }
         }
     });
-    
+
     // Send real-time updates
     while let Ok(msg) = rx.recv().await {
         if sender.send(Message::Text(msg.into())).await.is_err() {
             break;
         }
     }
-    
+
     tracing::debug!("WebSocket connection closed");
 }
