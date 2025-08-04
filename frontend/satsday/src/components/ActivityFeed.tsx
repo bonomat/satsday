@@ -8,7 +8,7 @@ import {Button} from "./ui/button";
 import {Tooltip, TooltipContent, TooltipProvider, TooltipTrigger} from "./ui/tooltip";
 
 const ActivityFeed = () => {
-    const { activities, isConnected: wsConnected, isLoading: loading } = useGameWebSocket(20);
+    const {activities, isConnected: wsConnected, isLoading: loading} = useGameWebSocket(20);
     const [copiedTxId, setCopiedTxId] = useState<string | null>(null);
 
     const copyToClipboard = async (text: string, txType: string) => {
@@ -144,14 +144,15 @@ const ActivityFeed = () => {
                                                 </TooltipContent>
                                             </Tooltip>
                                         </TooltipProvider>
-                                        <a
-                                            href={`https://mempool.space/tx/${activity.input_tx_id}`}
-                                            target="_blank"
-                                            rel="noopener noreferrer"
-                                            className="text-orange-400 hover:text-orange-300"
-                                        >
-                                            <ExternalLink className="h-3 w-3"/>
-                                        </a>
+                                        {/*TODO: add a link to verify this game */}
+                                        {/*<a*/}
+                                        {/*    href={`https://mempool.space/tx/${activity.input_tx_id}`}*/}
+                                        {/*    target="_blank"*/}
+                                        {/*    rel="noopener noreferrer"*/}
+                                        {/*    className="text-orange-400 hover:text-orange-300"*/}
+                                        {/*>*/}
+                                        {/*    <ExternalLink className="h-3 w-3"/>*/}
+                                        {/*</a>*/}
                                     </div>
 
                                     {activity.output_tx_id && (
@@ -179,14 +180,14 @@ const ActivityFeed = () => {
                                                     </TooltipContent>
                                                 </Tooltip>
                                             </TooltipProvider>
-                                            <a
-                                                href={`https://mempool.space/tx/${activity.output_tx_id}`}
-                                                target="_blank"
-                                                rel="noopener noreferrer"
-                                                className="text-orange-400 hover:text-orange-300"
-                                            >
-                                                <ExternalLink className="h-3 w-3"/>
-                                            </a>
+                                            {/*<a*/}
+                                            {/*    href={`https://mempool.space/tx/${activity.output_tx_id}`}*/}
+                                            {/*    target="_blank"*/}
+                                            {/*    rel="noopener noreferrer"*/}
+                                            {/*    className="text-orange-400 hover:text-orange-300"*/}
+                                            {/*>*/}
+                                            {/*    <ExternalLink className="h-3 w-3"/>*/}
+                                            {/*</a>*/}
                                         </div>
                                     )}
 
