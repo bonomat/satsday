@@ -29,7 +29,6 @@ export function useGameWebSocket(maxItems: number = 20): UseGameWebSocketReturn 
             },
             // Connection status callback
             (connected) => {
-                console.log(activities);
                 setIsConnected(connected);
                 if (!connected && activities.length === 0) {
                     setIsLoading(false);

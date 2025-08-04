@@ -16,6 +16,7 @@ class GameWebSocketService {
     private connectionCallbacks: Set<ConnectionCallback> = new Set();
     private reconnectDelay = 5000;
     private shouldReconnect = true;
+    private cachedHistory: GameHistoryItem[] | null = null;
 
     constructor() {
         this.connect();
@@ -23,7 +24,6 @@ class GameWebSocketService {
 
     private getWebSocketUrl(): string {
         const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || window.location.origin;
-        console.log('getWebSocketUrl', API_BASE_URL);
 
         // Convert http/https to ws/wss
         let wsUrl = API_BASE_URL
@@ -37,27 +37,33 @@ class GameWebSocketService {
     }
 
     private connect(): void {
-        if (this.ws?.readyState === WebSocket.OPEN) {
+        if (this.ws?.readyState === WebSocket.OPEN || this.ws?.readyState === WebSocket.CONNECTING) {
             return;
+        }
+
+        // Clean up any existing connection
+        if (this.ws) {
+            this.ws.close();
+            this.ws = null;
         }
 
         try {
             const wsUrl = this.getWebSocketUrl();
-            console.log(`Connecting to WebSocket: ${wsUrl}`);
 
             this.ws = new WebSocket(wsUrl);
 
             this.ws.onopen = () => {
-                console.log('WebSocket connected');
                 this.notifyConnectionStatus(true);
             };
 
             this.ws.onmessage = (event) => {
                 try {
+
                     const data = JSON.parse(event.data);
 
                     if (data.type === 'history' && data.games) {
                         // Initial history load
+                        this.cachedHistory = data.games;
                         this.notifySubscribers(data.games);
                     } else {
                         // Real-time update - single game
@@ -108,6 +114,16 @@ class GameWebSocketService {
             this.connectionCallbacks.add(onConnectionChange);
             // Notify current connection status
             onConnectionChange(this.ws?.readyState === WebSocket.OPEN);
+        }
+
+        // If we have cached history data and this is the first subscriber, send it immediately
+        if (this.cachedHistory && this.messageCallbacks.size === 1) {
+            setTimeout(() => {
+                if (this.cachedHistory) {
+                    onMessage(this.cachedHistory);
+                    this.cachedHistory = null; // Clear cache after sending
+                }
+            }, 0);
         }
 
         // Return unsubscribe function

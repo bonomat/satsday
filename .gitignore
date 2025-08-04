@@ -5,3 +5,5 @@ ark.seed
 .idea
 db.sqlite
 *.seed
+node_modules
+.DS_Store

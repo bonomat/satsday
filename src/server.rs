@@ -364,7 +364,7 @@ async fn handle_websocket(socket: axum::extract::ws::WebSocket, state: AppState)
     };
 
     // Spawn task to handle incoming messages (ping/pong)
-    tokio::spawn(async move {
+    let receiver_task = tokio::spawn(async move {
         while let Some(Ok(msg)) = receiver.next().await {
             match msg {
                 Message::Ping(_) => {
@@ -379,10 +379,22 @@ async fn handle_websocket(socket: axum::extract::ws::WebSocket, state: AppState)
         }
     });
 
-    // Send real-time updates
-    while let Ok(msg) = rx.recv().await {
-        if sender.send(Message::Text(msg.into())).await.is_err() {
-            break;
+    // Spawn task to send real-time updates
+    let sender_task = tokio::spawn(async move {
+        while let Ok(msg) = rx.recv().await {
+            if sender.send(Message::Text(msg.into())).await.is_err() {
+                break;
+            }
+        }
+    });
+
+    // Wait for either task to complete (connection closed or error)
+    tokio::select! {
+        _ = receiver_task => {
+            tracing::debug!("WebSocket receiver task completed");
+        }
+        _ = sender_task => {
+            tracing::debug!("WebSocket sender task completed");
         }
     }
 
