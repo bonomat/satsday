@@ -6,20 +6,20 @@ export default function HowItWorksContent() {
     const steps = [
         {
             icon: Bitcoin,
-            title: "Bitcoin Transaction",
-            description: "A recent Bitcoin transaction hash is selected as the randomness source.",
-            detail: "We use the latest Bitcoin block hash to ensure true randomness that cannot be manipulated.",
+            title: "Ark Transaction",
+            description: "Your Ark transaction hash is selected as the randomness source.",
+            detail: "We use the transaction hash you sent to us to ensure true randomness that cannot be manipulated.",
         },
         {
             icon: Hash,
             title: "Seed Combination",
             description: "The Bitcoin hash is combined with client and server seeds.",
-            detail: "Your client seed + our server seed + Bitcoin hash = provably fair randomness.",
+            detail: "Your transaction hash + our server seed = provably fair randomness.",
         },
         {
             icon: Dice6,
             title: "Result Generation",
-            description: "The combined hash generates a number from 1-6 for the dice result.",
+            description: "The combined hash generates a number from 1-65535 for the dice result.",
             detail: "Mathematical algorithms convert the hash into a fair dice roll you can verify.",
         },
         {
@@ -95,8 +95,8 @@ export default function HowItWorksContent() {
                     {/* TODO: fix the description */}
                     <div className="bg-muted/30 p-4 rounded-lg">
                         <p className="text-sm text-muted-foreground text-center">
-                            <strong>Formula:</strong> HMAC-SHA256(client_tx:nonce, server_seed) → Dice
-                            Result (1-)
+                            <strong>Formula:</strong> HMAC-SHA256(client_tx, server_seed) → Dice
+                            Result (1-65535)
                         </p>
                     </div>
                 </CardContent>
