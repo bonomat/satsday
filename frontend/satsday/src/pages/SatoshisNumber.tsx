@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Slider } from "@/components/ui/slider";
@@ -27,6 +27,11 @@ const calculateBetDetails = (number: number) => {
 
 export default function SatoshisNumber() {
   const [betNumber, setBetNumber] = useState([4]);
+
+  // Scroll to top when component mounts
+  useEffect(() => {
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  }, []);
 
   const gameDataState = useAsync(async () => {
     return await gameService.fetchGameAddresses();
