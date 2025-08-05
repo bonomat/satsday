@@ -13,7 +13,7 @@ export default function HowItWorksContent() {
         {
             icon: Hash,
             title: "Seed Combination",
-            description: "The Bitcoin hash is combined with client and server seeds.",
+            description: "The transaction hash is combined with our server seed.",
             detail: "Your transaction hash + our server seed = provably fair randomness.",
         },
         {
@@ -35,7 +35,7 @@ export default function HowItWorksContent() {
             <div className="text-center space-y-4">
                 <h2 className="text-3xl font-bold">How Provably Fair Works</h2>
                 <p className="text-muted-foreground max-w-2xl mx-auto">
-                    Our system uses Ark transaction data to generate truly random and verifiable dice results.
+                    Our system uses Ark transaction hashes to generate truly random and verifiable dice results.
                     Here's how we guarantee fairness in every roll.
                 </p>
             </div>

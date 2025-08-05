@@ -10,6 +10,7 @@ use axum::{
 use serde::{Deserialize, Serialize};
 use serde_json::{Value, json};
 use sha2::{Digest, Sha256};
+use sqlx::types::time::OffsetDateTime;
 use sqlx::{Pool, Sqlite};
 use std::sync::Arc;
 use tokio::net::TcpListener;
@@ -49,8 +50,6 @@ struct PaginationQuery {
 #[derive(Serialize, Clone)]
 pub struct GameHistoryItem {
     pub id: String,
-    // TODO: make this a timestamp
-    pub time_ago: String,
     pub amount_sent: String,
     pub multiplier: f64,
     pub result_number: i64,
@@ -59,9 +58,10 @@ pub struct GameHistoryItem {
     pub payout: String,
     pub input_tx_id: String,
     pub output_tx_id: Option<String>,
-    pub nonce: Option<String>, // Actual nonce, only revealed after new nonce is generated
-    pub nonce_hash: String,    // Always provided for verification
-    pub timestamp: String,
+    pub nonce: Option<String>,
+    pub nonce_hash: String,
+    #[serde(with = "time::serde::timestamp")]
+    pub timestamp: OffsetDateTime,
 }
 
 #[derive(Serialize)]
@@ -212,14 +212,9 @@ async fn get_games(
 
     let total_pages = (total as f64 / page_size as f64).ceil() as i64;
 
-    let now = time::OffsetDateTime::now_utc();
-
     let mut game_items: Vec<GameHistoryItem> = Vec::new();
 
     for game in games {
-        let time_diff = now - game.timestamp;
-        let time_ago = format_time_ago(time_diff);
-
         let target_number = (65536.0 * 1000.0 / game.multiplier as f64) as i64;
 
         let revealable_nonce = state.nonce_service.get_revealable_nonce(&game.nonce).await;
@@ -235,7 +230,6 @@ async fn get_games(
 
         game_items.push(GameHistoryItem {
             id: game.id.to_string(),
-            time_ago,
             amount_sent: format!("{:.8} BTC", game.bet_amount as f64 / 100_000_000.0),
             multiplier: game.multiplier as f64 / 1000.0,
             result_number: game.rolled_number,
@@ -253,7 +247,7 @@ async fn get_games(
             output_tx_id: game.output_tx_id,
             nonce: revealable_nonce,
             nonce_hash,
-            timestamp: game.timestamp.to_string(),
+            timestamp: game.timestamp,
         });
     }
 
@@ -264,23 +258,6 @@ async fn get_games(
         page_size,
         total_pages,
     }))
-}
-
-pub fn format_time_ago(duration: time::Duration) -> String {
-    let seconds = duration.whole_seconds();
-
-    if seconds < 60 {
-        format!("{} sec ago", seconds)
-    } else if seconds < 3600 {
-        let minutes = seconds / 60;
-        format!("{} min ago", minutes)
-    } else if seconds < 86400 {
-        let hours = seconds / 3600;
-        format!("{} hour{} ago", hours, if hours == 1 { "" } else { "s" })
-    } else {
-        let days = seconds / 86400;
-        format!("{} day{} ago", days, if days == 1 { "" } else { "s" })
-    }
 }
 
 async fn get_version() -> Result<Json<Value>, StatusCode> {
@@ -326,12 +303,9 @@ async fn handle_websocket(socket: axum::extract::ws::WebSocket, state: AppState)
     // Send historical data first
     match get_game_results_paginated(&state.pool, 1, 20).await {
         Ok(games) => {
-            let now = time::OffsetDateTime::now_utc();
             let mut game_items: Vec<GameHistoryItem> = Vec::new();
 
             for game in games {
-                let time_diff = now - game.timestamp;
-                let time_ago = format_time_ago(time_diff);
                 let target_number = (65536.0 * 1000.0 / game.multiplier as f64) as i64;
 
                 let revealable_nonce = state.nonce_service.get_revealable_nonce(&game.nonce).await;
@@ -347,7 +321,6 @@ async fn handle_websocket(socket: axum::extract::ws::WebSocket, state: AppState)
 
                 game_items.push(GameHistoryItem {
                     id: game.id.to_string(),
-                    time_ago,
                     amount_sent: format!("{:.8} BTC", game.bet_amount as f64 / 100_000_000.0),
                     multiplier: game.multiplier as f64 / 1000.0,
                     result_number: game.rolled_number,
@@ -365,7 +338,7 @@ async fn handle_websocket(socket: axum::extract::ws::WebSocket, state: AppState)
                     output_tx_id: game.output_tx_id,
                     nonce: revealable_nonce,
                     nonce_hash,
-                    timestamp: game.timestamp.to_string(),
+                    timestamp: game.timestamp,
                 });
             }
 

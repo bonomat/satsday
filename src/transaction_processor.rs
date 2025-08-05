@@ -195,7 +195,6 @@ impl TransactionProcessor {
                             tracing::error!("Failed to store game result: {}", e);
                         } else {
                             // Broadcast the game result
-                            let now = time::OffsetDateTime::now_utc();
                             let nonce_str = current_nonce.to_string();
                             let revealable_nonce =
                                 self.nonce_service.get_revealable_nonce(&nonce_str).await;
@@ -203,7 +202,6 @@ impl TransactionProcessor {
 
                             let game_item = GameHistoryItem {
                                 id: "latest".to_string(), // This will be replaced by actual ID from DB
-                                time_ago: "just now".to_string(),
                                 amount_sent: format!(
                                     "{:.8} BTC",
                                     input_amount as f64 / 100_000_000.0
@@ -218,7 +216,7 @@ impl TransactionProcessor {
                                 output_tx_id: Some(txid.to_string()),
                                 nonce: revealable_nonce,
                                 nonce_hash,
-                                timestamp: now.to_string(),
+                                timestamp: time::OffsetDateTime::now_utc(),
                             };
 
                             self.broadcast_game_result(game_item).await;
@@ -258,7 +256,6 @@ impl TransactionProcessor {
                     tracing::error!("Failed to store game result: {}", e);
                 } else {
                     // Broadcast the game result
-                    let now = time::OffsetDateTime::now_utc();
                     let nonce_str = current_nonce.to_string();
                     let revealable_nonce =
                         self.nonce_service.get_revealable_nonce(&nonce_str).await;
@@ -266,7 +263,6 @@ impl TransactionProcessor {
 
                     let game_item = GameHistoryItem {
                         id: "latest".to_string(), // This will be replaced by actual ID from DB
-                        time_ago: "just now".to_string(),
                         amount_sent: format!("{:.8} BTC", input_amount as f64 / 100_000_000.0),
                         multiplier: multiplier.multiplier() as f64 / 1000.0,
                         result_number: rolled_number,
@@ -277,7 +273,7 @@ impl TransactionProcessor {
                         output_tx_id: None,
                         nonce: revealable_nonce,
                         nonce_hash,
-                        timestamp: now.to_string(),
+                        timestamp: time::OffsetDateTime::now_utc(),
                     };
 
                     self.broadcast_game_result(game_item).await;

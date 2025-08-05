@@ -2,7 +2,6 @@ const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:12345';
 
 export interface GameHistoryItem {
     id: string;
-    time_ago: string;
     amount_sent: string;
     multiplier: number;
     result_number: number;
@@ -13,7 +12,7 @@ export interface GameHistoryItem {
     output_tx_id: string | null;
     nonce?: string;
     nonce_hash: string;
-    timestamp: string;
+    timestamp: number;
 }
 
 export interface GameHistoryResponse {
