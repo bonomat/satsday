@@ -10,15 +10,14 @@ export default function GameHero() {
         <div className="space-y-6">
           <h1 className="text-5xl md:text-7xl font-bold tracking-tight">
             <span className="bg-gradient-to-r from-primary via-orange-500 to-yellow-500 bg-clip-text text-transparent">
-              Provably Fair
+              Every day is Satsday
             </span>
             <br />
-            <span className="text-foreground">Bitcoin Gaming</span>
+            <span className="text-foreground text-4xl">Provably Fair Bitcoin Games</span>
           </h1>
 
           <p className="text-xl md:text-2xl text-muted-foreground max-w-3xl mx-auto leading-relaxed">
-            Experience transparent gaming powered by Bitcoin with Ark settlement
-            layer. Every outcome is verifiable, every game is provably fair.
+            Experience transparent gaming powered by Ark. Every outcome is verifiable. Every game is provably fair. Every day is Satsday.
           </p>
 
           <div className="flex flex-col sm:flex-row gap-4 justify-center items-center">
