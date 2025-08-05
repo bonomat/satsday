@@ -7,7 +7,7 @@ export default function GamesOverview() {
   const games = [
     {
       id: "dice",
-      name: "Dice",
+      name: "Satoshi's Number",
       description:
         "Classic provably fair dice with 11 betting options and up to 1000x multipliers",
       icon: Dice1,

@@ -101,12 +101,23 @@ export default function Game() {
         {/* Game Header */}
         <div className="text-center space-y-4">
           <h1 className="text-4xl font-bold bg-gradient-to-r from-primary to-orange-500 bg-clip-text text-transparent">
-            Provably Fair Dice Game
+            Satoshi's Number
           </h1>
           <p className="text-muted-foreground max-w-2xl mx-auto">
-            Send Bitcoin to the address below and roll the dice. Results are
-            determined by Bitcoin transaction hashes.
+            Send sats to the address below to play against Satoshi.
+            Satoshi will think of a number between 1 and 65535.
+            Win if the number is lower than your selected threshold - higher risk means bigger rewards!
           </p>
+          <Button
+              variant="ghost"
+              size="sm"
+              className="text-sm text-muted-foreground underline"
+              onClick={() => {
+                document.getElementById('how-it-works')?.scrollIntoView({ behavior: 'smooth' });
+              }}
+          >
+            How Provably Fair Works
+          </Button>
         </div>
 
         {/* Betting Interface */}
@@ -221,7 +232,7 @@ export default function Game() {
         </Card>
 
         {/* How It Works Section */}
-        <section className="py-16 border-t border-border/50">
+        <section id="how-it-works" className="py-16 border-t border-border/50">
           <HowItWorks />
         </section>
       </div>
