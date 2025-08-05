@@ -102,7 +102,7 @@ const ActivityFeed = () => {
                       <p className="text-sm font-medium text-gray-300">
                         Sent:{" "}
                         <span className="text-white">
-                          {activity.amount_sent}
+                          {activity.amount_sent} sats
                         </span>
                       </p>
                       <p className="text-sm font-medium text-gray-300">
@@ -138,7 +138,8 @@ const ActivityFeed = () => {
                       <span
                         className={`text-sm font-medium ${activity.is_win ? "text-green-500" : "text-red-500"}`}
                       >
-                        Payout: {activity.payout}
+                        Payout:{" "}
+                        {activity.payout ? `${activity.payout} sats` : "None"}
                       </span>
                     </div>
                   </div>

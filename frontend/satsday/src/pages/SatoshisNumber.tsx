@@ -30,7 +30,7 @@ export default function SatoshisNumber() {
 
   // Scroll to top when component mounts
   useEffect(() => {
-    window.scrollTo({ top: 0, behavior: 'smooth' });
+    window.scrollTo({ top: 0, behavior: "smooth" });
   }, []);
 
   const gameDataState = useAsync(async () => {
@@ -109,17 +109,19 @@ export default function SatoshisNumber() {
             Satoshi's Number
           </h1>
           <p className="text-muted-foreground max-w-2xl mx-auto">
-            Send sats to the address below to play against Satoshi.
-            Satoshi will think of a number between 1 and 65535.
-            Win if the number is lower than your selected threshold - higher risk means bigger rewards!
+            Send sats to the address below to play against Satoshi. Satoshi will
+            think of a number between 1 and 65535. Win if the number is lower
+            than your selected threshold - higher risk means bigger rewards!
           </p>
           <Button
-              variant="ghost"
-              size="sm"
-              className="text-sm text-muted-foreground underline"
-              onClick={() => {
-                document.getElementById('how-it-works')?.scrollIntoView({ behavior: 'smooth' });
-              }}
+            variant="ghost"
+            size="sm"
+            className="text-sm text-muted-foreground underline"
+            onClick={() => {
+              document
+                .getElementById("how-it-works")
+                ?.scrollIntoView({ behavior: "smooth" });
+            }}
           >
             How Provably Fair Works
           </Button>

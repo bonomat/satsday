@@ -16,6 +16,7 @@ use axum::response::Json;
 use axum::response::Response;
 use axum::routing::get;
 use axum::Router;
+use bitcoin::Amount;
 use serde::Deserialize;
 use serde::Serialize;
 use serde_json::json;
@@ -55,12 +56,14 @@ struct PaginationQuery {
 #[derive(Serialize, Clone)]
 pub struct GameHistoryItem {
     pub id: String,
-    pub amount_sent: String,
+    #[serde(with = "bitcoin::amount::serde::as_sat")]
+    pub amount_sent: Amount,
     pub multiplier: f64,
     pub result_number: i64,
     pub target_number: i64,
     pub is_win: bool,
-    pub payout: String,
+    #[serde(with = "bitcoin::amount::serde::as_sat::opt")]
+    pub payout: Option<Amount>,
     pub input_tx_id: String,
     pub output_tx_id: Option<String>,
     pub nonce: Option<String>,
@@ -235,19 +238,12 @@ async fn get_games(
 
         game_items.push(GameHistoryItem {
             id: game.id.to_string(),
-            amount_sent: format!("{:.8} BTC", game.bet_amount as f64 / 100_000_000.0),
+            amount_sent: Amount::from_sat(game.bet_amount as u64),
             multiplier: game.multiplier as f64 / 100.0,
             result_number: game.rolled_number,
             target_number,
             is_win: game.is_winner,
-            payout: if game.is_winner {
-                format!(
-                    "{:.8} BTC",
-                    game.winning_amount.unwrap_or(0) as f64 / 100_000_000.0
-                )
-            } else {
-                "0 BTC".to_string()
-            },
+            payout: game.winning_amount.map(|a| Amount::from_sat(a as u64)),
             input_tx_id: game.input_tx_id,
             output_tx_id: game.output_tx_id,
             nonce: revealable_nonce,
@@ -327,19 +323,12 @@ async fn handle_websocket(socket: axum::extract::ws::WebSocket, state: AppState)
 
                 game_items.push(GameHistoryItem {
                     id: game.id.to_string(),
-                    amount_sent: format!("{:.8} BTC", game.bet_amount as f64 / 100_000_000.0),
+                    amount_sent: Amount::from_sat(game.bet_amount as u64),
                     multiplier: game.multiplier as f64 / 100.0,
                     result_number: game.rolled_number,
                     target_number,
                     is_win: game.is_winner,
-                    payout: if game.is_winner {
-                        format!(
-                            "{:.8} BTC",
-                            game.winning_amount.unwrap_or(0) as f64 / 100_000_000.0
-                        )
-                    } else {
-                        "0 BTC".to_string()
-                    },
+                    payout: game.winning_amount.map(|a| Amount::from_sat(a as u64)),
                     input_tx_id: game.input_tx_id,
                     output_tx_id: game.output_tx_id,
                     nonce: revealable_nonce,

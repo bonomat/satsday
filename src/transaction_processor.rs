@@ -8,6 +8,7 @@ use anyhow::Result;
 use ark_core::server::VirtualTxOutPoint;
 use ark_core::ArkAddress;
 use bitcoin::hashes::Hash;
+use bitcoin::Amount;
 use sqlx::Pool;
 use sqlx::Sqlite;
 use std::sync::Arc;
@@ -154,7 +155,7 @@ impl TransactionProcessor {
 
             if player_wins {
                 let payout = (input_amount * multiplier.multiplier()) / 100; //
-                let payout_amount = bitcoin::Amount::from_sat(payout);
+                let payout_amount = Amount::from_sat(payout);
 
                 tracing::info!(
                     max_value = max_value,
@@ -206,16 +207,13 @@ impl TransactionProcessor {
                             let game_item = GameHistoryItem {
                                 id: "latest".to_string(), /* This will be replaced by actual ID
                                                            * from DB */
-                                amount_sent: format!(
-                                    "{:.8} BTC",
-                                    input_amount as f64 / 100_000_000.0
-                                ),
+                                amount_sent: Amount::from_sat(input_amount),
                                 multiplier: multiplier.multiplier() as f64 / 100.0,
                                 result_number: rolled_number,
                                 target_number: (65536.0 * 1000.0 / multiplier.multiplier() as f64)
                                     as i64,
                                 is_win: true,
-                                payout: format!("{:.8} BTC", payout as f64 / 100_000_000.0),
+                                payout: Some(Amount::from_sat(payout)),
                                 input_tx_id: outpoint.outpoint.txid.to_string(),
                                 output_tx_id: Some(txid.to_string()),
                                 nonce: revealable_nonce,
@@ -267,12 +265,12 @@ impl TransactionProcessor {
 
                     let game_item = GameHistoryItem {
                         id: "latest".to_string(), // This will be replaced by actual ID from DB
-                        amount_sent: format!("{:.8} BTC", input_amount as f64 / 100_000_000.0),
+                        amount_sent: Amount::from_sat(input_amount),
                         multiplier: multiplier.multiplier() as f64 / 100.0,
                         result_number: rolled_number,
                         target_number: (65536.0 * 1000.0 / multiplier.multiplier() as f64) as i64,
                         is_win: false,
-                        payout: "0 BTC".to_string(),
+                        payout: None,
                         input_tx_id: outpoint.outpoint.txid.to_string(),
                         output_tx_id: None,
                         nonce: revealable_nonce,

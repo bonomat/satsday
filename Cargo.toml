@@ -13,7 +13,7 @@ ark-core = { git = "https://github.com/arkade-os/rust-sdk.git", rev = "1f905be" 
 ark-grpc = { git = "https://github.com/arkade-os/rust-sdk.git", rev = "1f905be" }
 atty = "0.2.14"
 axum = { version = "0.8", features = ["ws"] }
-bitcoin = { version = "0.32.4", features = ["rand"] }
+bitcoin = { version = "0.32.4", features = ["rand", "serde"] }
 clap = { version = "4", features = ["derive"] }
 esplora-client = { version = "0.10.0", features = ["async-https", "blocking-https"] }
 futures = "0.3"
