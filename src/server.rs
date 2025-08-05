@@ -1,28 +1,33 @@
+use crate::db::get_game_results_paginated;
+use crate::db::get_total_game_count;
+use crate::nonce_service::spawn_nonce_service;
+use crate::transaction_processor::spawn_transaction_monitor;
+use crate::websocket::SharedBroadcaster;
+use crate::websocket::WebSocketBroadcaster;
+use crate::ArkClient;
 use anyhow::Result;
-use axum::http::{HeaderValue, Method};
-use axum::{
-    Router,
-    extract::{Query, State, WebSocketUpgrade},
-    http::StatusCode,
-    response::{Json, Response},
-    routing::get,
-};
-use serde::{Deserialize, Serialize};
-use serde_json::{Value, json};
-use sha2::{Digest, Sha256};
+use axum::extract::Query;
+use axum::extract::State;
+use axum::extract::WebSocketUpgrade;
+use axum::http::HeaderValue;
+use axum::http::Method;
+use axum::http::StatusCode;
+use axum::response::Json;
+use axum::response::Response;
+use axum::routing::get;
+use axum::Router;
+use serde::Deserialize;
+use serde::Serialize;
+use serde_json::json;
+use serde_json::Value;
+use sha2::Digest;
+use sha2::Sha256;
 use sqlx::types::time::OffsetDateTime;
-use sqlx::{Pool, Sqlite};
+use sqlx::Pool;
+use sqlx::Sqlite;
 use std::sync::Arc;
 use tokio::net::TcpListener;
 use tower_http::cors::CorsLayer;
-
-use crate::{
-    ArkClient,
-    db::{get_game_results_paginated, get_total_game_count},
-    nonce_service::spawn_nonce_service,
-    transaction_processor::spawn_transaction_monitor,
-    websocket::{SharedBroadcaster, WebSocketBroadcaster},
-};
 
 #[derive(Clone)]
 pub struct AppState {
@@ -296,7 +301,8 @@ async fn websocket_handler(ws: WebSocketUpgrade, State(state): State<AppState>) 
 
 async fn handle_websocket(socket: axum::extract::ws::WebSocket, state: AppState) {
     use axum::extract::ws::Message;
-    use futures_util::{SinkExt, StreamExt};
+    use futures_util::SinkExt;
+    use futures_util::StreamExt;
 
     let (mut sender, mut receiver) = socket.split();
 

@@ -1,16 +1,19 @@
-use anyhow::Result;
-use ark_core::ArkAddress;
-use ark_core::server::VirtualTxOutPoint;
-use bitcoin::hashes::Hash;
-use sqlx::{Pool, Sqlite};
-use std::sync::Arc;
-use time;
-use tokio::time::{Duration, sleep};
-
+use crate::db;
 use crate::key_derivation::Multiplier;
+use crate::nonce_service::NonceService;
 use crate::server::GameHistoryItem;
 use crate::websocket::SharedBroadcaster;
-use crate::{ArkClient, db, nonce_service::NonceService};
+use crate::ArkClient;
+use anyhow::Result;
+use ark_core::server::VirtualTxOutPoint;
+use ark_core::ArkAddress;
+use bitcoin::hashes::Hash;
+use sqlx::Pool;
+use sqlx::Sqlite;
+use std::sync::Arc;
+use time;
+use tokio::time::sleep;
+use tokio::time::Duration;
 
 pub struct TransactionProcessor {
     ark_client: Arc<ArkClient>,
@@ -201,7 +204,8 @@ impl TransactionProcessor {
                             let nonce_hash = self.nonce_service.get_current_nonce_hash().await;
 
                             let game_item = GameHistoryItem {
-                                id: "latest".to_string(), // This will be replaced by actual ID from DB
+                                id: "latest".to_string(), /* This will be replaced by actual ID
+                                                           * from DB */
                                 amount_sent: format!(
                                     "{:.8} BTC",
                                     input_amount as f64 / 100_000_000.0

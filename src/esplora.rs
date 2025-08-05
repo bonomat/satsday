@@ -1,6 +1,8 @@
 use anyhow::Result;
 use ark_core::ExplorerUtxo;
-use bitcoin::{Amount, OutPoint, Txid};
+use bitcoin::Amount;
+use bitcoin::OutPoint;
+use bitcoin::Txid;
 
 #[derive(Clone, Copy, Debug)]
 pub struct SpendStatus {

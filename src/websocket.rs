@@ -1,6 +1,7 @@
-use std::sync::Arc;
-use tokio::sync::{broadcast, RwLock};
 use crate::server::GameHistoryItem;
+use std::sync::Arc;
+use tokio::sync::broadcast;
+use tokio::sync::RwLock;
 
 #[derive(Clone)]
 pub struct WebSocketBroadcaster {
@@ -20,7 +21,7 @@ impl WebSocketBroadcaster {
     pub fn broadcast_game_result(&self, game: GameHistoryItem) -> Result<(), String> {
         let message = serde_json::to_string(&game)
             .map_err(|e| format!("Failed to serialize game result: {}", e))?;
-        
+
         // Ignore send errors (no receivers)
         let _ = self.tx.send(message);
         Ok(())

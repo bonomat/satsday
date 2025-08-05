@@ -1,34 +1,52 @@
-use crate::key_derivation::{KeyDerivation, Multiplier};
-use anyhow::{Context, Result, bail};
-use ark_core::batch::{
-    create_and_sign_forfeit_txs, generate_nonce_tree, sign_batch_tree, sign_commitment_psbt,
-};
+use crate::config::Config;
+use crate::esplora::EsploraClient;
+use crate::key_derivation::KeyDerivation;
+use crate::key_derivation::Multiplier;
+use anyhow::bail;
+use anyhow::Context;
+use anyhow::Result;
+use ark_core::batch;
+use ark_core::batch::create_and_sign_forfeit_txs;
+use ark_core::batch::generate_nonce_tree;
+use ark_core::batch::sign_batch_tree;
+use ark_core::batch::sign_commitment_psbt;
+use ark_core::boarding_output::list_boarding_outpoints;
+use ark_core::boarding_output::BoardingOutpoints;
+use ark_core::coin_select::select_vtxos;
+use ark_core::proof_of_funds;
+use ark_core::send;
+use ark_core::send::build_offchain_transactions;
 use ark_core::send::sign_ark_transaction;
-use ark_core::server::{GetVtxosRequest, StreamEvent};
+use ark_core::send::sign_checkpoint_transaction;
+use ark_core::send::OffchainTransactions;
+use ark_core::server::BatchTreeEventType;
+use ark_core::server::GetVtxosRequest;
+use ark_core::server::StreamEvent;
+use ark_core::vtxo::list_virtual_tx_outpoints;
 use ark_core::vtxo::VirtualTxOutPoints;
-use ark_core::{
-    ArkAddress, BoardingOutput, TxGraph, Vtxo, batch,
-    boarding_output::{BoardingOutpoints, list_boarding_outpoints},
-    coin_select::select_vtxos,
-    proof_of_funds, send,
-    send::{OffchainTransactions, build_offchain_transactions, sign_checkpoint_transaction},
-    server::BatchTreeEventType,
-    vtxo::list_virtual_tx_outpoints,
-};
+use ark_core::ArkAddress;
+use ark_core::BoardingOutput;
+use ark_core::TxGraph;
+use ark_core::Vtxo;
+use bitcoin::hashes::sha256;
+use bitcoin::hashes::Hash;
+use bitcoin::hex::DisplayHex;
+use bitcoin::key::Keypair;
+use bitcoin::key::Secp256k1;
 use bitcoin::key::TweakedPublicKey;
-use bitcoin::{
-    Amount, OutPoint, TxOut, Txid, XOnlyPublicKey,
-    hashes::{Hash, sha256},
-    hex::DisplayHex,
-    key::{Keypair, Secp256k1},
-    secp256k1::{self, PublicKey, SecretKey, schnorr},
-};
+use bitcoin::secp256k1::schnorr;
+use bitcoin::secp256k1::PublicKey;
+use bitcoin::secp256k1::SecretKey;
+use bitcoin::secp256k1::{self};
+use bitcoin::Amount;
+use bitcoin::OutPoint;
+use bitcoin::TxOut;
+use bitcoin::Txid;
+use bitcoin::XOnlyPublicKey;
 use futures::StreamExt;
 use rand::thread_rng;
 use std::collections::HashMap;
 use tokio::task::block_in_place;
-
-use crate::{config::Config, esplora::EsploraClient};
 
 pub struct ArkClient {
     grpc_client: ark_grpc::Client,

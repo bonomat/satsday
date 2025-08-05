@@ -1,4 +1,5 @@
-use sqlx::{Pool, Sqlite};
+use sqlx::Pool;
+use sqlx::Sqlite;
 use time::OffsetDateTime;
 
 #[derive(Debug, sqlx::FromRow)]
@@ -184,7 +185,7 @@ pub async fn get_game_results_paginated(
     page_size: i64,
 ) -> Result<Vec<GameResult>, sqlx::Error> {
     let offset = (page - 1) * page_size;
-    
+
     let results = sqlx::query_as!(
         GameResult,
         r#"
