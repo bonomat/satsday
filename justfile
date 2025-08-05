@@ -6,9 +6,16 @@ CONFIG_FILE := env_var_or_default('CONFIG_FILE', 'local.config.toml')
 
 fmt:
     just fmt-dprint
+    just fmt-frontend
 
 fmt-dprint:
     dprint fmt
+
+fmt-frontend:
+    #!/usr/bin/env bash
+    set -euxo pipefail
+    cd frontend/satsday
+    pnpm biome format --write .
 
 clippy:
     cargo clippy --all-targets --all-features -- -D warnings

@@ -8,11 +8,12 @@ export default function GamesOverview() {
     {
       id: "dice",
       name: "Dice",
-      description: "Classic provably fair dice with 11 betting options and up to 1000x multipliers",
+      description:
+        "Classic provably fair dice with 11 betting options and up to 1000x multipliers",
       icon: Dice1,
       status: "Available",
       multiplier: "1000x",
-      link: "/game"
+      link: "/game",
     },
     {
       id: "coin-flip",
@@ -21,7 +22,7 @@ export default function GamesOverview() {
       icon: Coins,
       status: "Coming Soon",
       multiplier: "2x",
-      link: "#"
+      link: "#",
     },
     {
       id: "blackjack",
@@ -30,7 +31,7 @@ export default function GamesOverview() {
       icon: Spade,
       status: "Coming Soon",
       multiplier: "3.5x",
-      link: "#"
+      link: "#",
     },
     {
       id: "roulette",
@@ -39,7 +40,7 @@ export default function GamesOverview() {
       icon: Target,
       status: "Coming Soon",
       multiplier: "36x",
-      link: "#"
+      link: "#",
     },
     {
       id: "crash",
@@ -48,8 +49,8 @@ export default function GamesOverview() {
       icon: Clock,
       status: "Coming Soon",
       multiplier: "∞x",
-      link: "#"
-    }
+      link: "#",
+    },
   ];
 
   return (
@@ -62,7 +63,8 @@ export default function GamesOverview() {
             </span>
           </h2>
           <p className="text-xl text-muted-foreground max-w-2xl mx-auto">
-            Choose from our collection of provably fair games, each powered by Bitcoin transactions
+            Choose from our collection of provably fair games, each powered by
+            Bitcoin transactions
           </p>
         </div>
 
@@ -70,28 +72,36 @@ export default function GamesOverview() {
           {games.map((game) => {
             const IconComponent = game.icon;
             const isAvailable = game.status === "Available";
-            
+
             return (
-              <Card 
-                key={game.id} 
+              <Card
+                key={game.id}
                 className={`relative overflow-hidden transition-all duration-300 hover:scale-105 ${
-                  isAvailable 
-                    ? "bg-gradient-to-br from-card to-card/50 border-primary/20 hover:border-primary/40" 
+                  isAvailable
+                    ? "bg-gradient-to-br from-card to-card/50 border-primary/20 hover:border-primary/40"
                     : "bg-gradient-to-br from-card/50 to-card/20 border-border/20"
                 }`}
               >
                 <CardHeader className="pb-4">
                   <div className="flex items-center justify-between">
-                    <div className={`w-12 h-12 rounded-lg flex items-center justify-center ${
-                      isAvailable ? "bg-primary/10" : "bg-muted/50"
-                    }`}>
-                      <IconComponent className={`w-6 h-6 ${
-                        isAvailable ? "text-primary" : "text-muted-foreground"
-                      }`} />
+                    <div
+                      className={`w-12 h-12 rounded-lg flex items-center justify-center ${
+                        isAvailable ? "bg-primary/10" : "bg-muted/50"
+                      }`}
+                    >
+                      <IconComponent
+                        className={`w-6 h-6 ${
+                          isAvailable ? "text-primary" : "text-muted-foreground"
+                        }`}
+                      />
                     </div>
                     <div className="text-right">
-                      <div className="text-2xl font-bold text-primary">{game.multiplier}</div>
-                      <div className="text-xs text-muted-foreground">Max Win</div>
+                      <div className="text-2xl font-bold text-primary">
+                        {game.multiplier}
+                      </div>
+                      <div className="text-xs text-muted-foreground">
+                        Max Win
+                      </div>
                     </div>
                   </div>
                   <CardTitle className="text-xl">{game.name}</CardTitle>
@@ -100,21 +110,21 @@ export default function GamesOverview() {
                   <p className="text-muted-foreground text-sm leading-relaxed">
                     {game.description}
                   </p>
-                  
+
                   <div className="flex items-center justify-between">
-                    <span className={`px-3 py-1 rounded-full text-xs font-medium ${
-                      isAvailable 
-                        ? "bg-green-500/10 text-green-400 border border-green-500/20" 
-                        : "bg-muted/50 text-muted-foreground border border-border/50"
-                    }`}>
+                    <span
+                      className={`px-3 py-1 rounded-full text-xs font-medium ${
+                        isAvailable
+                          ? "bg-green-500/10 text-green-400 border border-green-500/20"
+                          : "bg-muted/50 text-muted-foreground border border-border/50"
+                      }`}
+                    >
                       {game.status}
                     </span>
-                    
+
                     {isAvailable ? (
                       <Button variant="game" size="sm" asChild>
-                        <Link to={game.link}>
-                          Play Now
-                        </Link>
+                        <Link to={game.link}>Play Now</Link>
                       </Button>
                     ) : (
                       <Button variant="outline" size="sm" disabled>
@@ -123,7 +133,7 @@ export default function GamesOverview() {
                     )}
                   </div>
                 </CardContent>
-                
+
                 {!isAvailable && (
                   <div className="absolute inset-0 bg-background/5 backdrop-blur-[1px]" />
                 )}
