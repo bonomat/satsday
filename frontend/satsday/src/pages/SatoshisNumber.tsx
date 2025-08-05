@@ -25,7 +25,7 @@ const calculateBetDetails = (number: number) => {
   };
 };
 
-export default function Game() {
+export default function SatoshisNumber() {
   const [betNumber, setBetNumber] = useState([4]);
 
   const gameDataState = useAsync(async () => {
