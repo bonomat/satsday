@@ -210,7 +210,7 @@ impl TransactionProcessor {
                                     "{:.8} BTC",
                                     input_amount as f64 / 100_000_000.0
                                 ),
-                                multiplier: multiplier.multiplier() as f64 / 1000.0,
+                                multiplier: multiplier.multiplier() as f64 / 100.0,
                                 result_number: rolled_number,
                                 target_number: (65536.0 * 1000.0 / multiplier.multiplier() as f64)
                                     as i64,
@@ -268,7 +268,7 @@ impl TransactionProcessor {
                     let game_item = GameHistoryItem {
                         id: "latest".to_string(), // This will be replaced by actual ID from DB
                         amount_sent: format!("{:.8} BTC", input_amount as f64 / 100_000_000.0),
-                        multiplier: multiplier.multiplier() as f64 / 1000.0,
+                        multiplier: multiplier.multiplier() as f64 / 100.0,
                         result_number: rolled_number,
                         target_number: (65536.0 * 1000.0 / multiplier.multiplier() as f64) as i64,
                         is_win: false,

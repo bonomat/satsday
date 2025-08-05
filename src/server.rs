@@ -236,7 +236,7 @@ async fn get_games(
         game_items.push(GameHistoryItem {
             id: game.id.to_string(),
             amount_sent: format!("{:.8} BTC", game.bet_amount as f64 / 100_000_000.0),
-            multiplier: game.multiplier as f64 / 1000.0,
+            multiplier: game.multiplier as f64 / 100.0,
             result_number: game.rolled_number,
             target_number,
             is_win: game.is_winner,
@@ -328,7 +328,7 @@ async fn handle_websocket(socket: axum::extract::ws::WebSocket, state: AppState)
                 game_items.push(GameHistoryItem {
                     id: game.id.to_string(),
                     amount_sent: format!("{:.8} BTC", game.bet_amount as f64 / 100_000_000.0),
-                    multiplier: game.multiplier as f64 / 1000.0,
+                    multiplier: game.multiplier as f64 / 100.0,
                     result_number: game.rolled_number,
                     target_number,
                     is_win: game.is_winner,
