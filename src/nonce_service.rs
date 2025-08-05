@@ -29,8 +29,28 @@ impl NonceService {
         *self.current_nonce.read().await
     }
     
+    pub async fn get_current_nonce_hash(&self) -> String {
+        let nonce = self.get_current_nonce().await;
+        let mut hasher = Sha256::new();
+        hasher.update(nonce.to_string());
+        format!("{:x}", hasher.finalize())
+    }
+    
     pub async fn verify_nonce(&self, nonce: &str) -> Result<bool, sqlx::Error> {
         db::is_nonce_valid(&self.db_pool, nonce).await
+    }
+    
+    // Returns the actual nonce if it's safe to reveal (not the current one), otherwise returns None
+    pub async fn get_revealable_nonce(&self, nonce_str: &str) -> Option<String> {
+        let current_nonce = self.get_current_nonce().await;
+        let nonce_u64 = nonce_str.parse::<u64>().ok()?;
+        
+        // Only reveal if it's not the current nonce
+        if nonce_u64 != current_nonce {
+            Some(nonce_str.to_string())
+        } else {
+            None
+        }
     }
 
     pub async fn start_periodic_generation(&self, interval_hours: u64) {

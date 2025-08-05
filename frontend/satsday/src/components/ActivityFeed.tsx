@@ -191,19 +191,38 @@ const ActivityFeed = () => {
                                         </div>
                                     )}
 
-                                    <div className="flex items-center gap-2 text-xs">
-                                        <span className="text-gray-400">Nonce:</span>
-                                        <TooltipProvider>
-                                            <Tooltip>
-                                                <TooltipTrigger asChild>
-                                                    <code className="text-gray-300">{activity.nonce}</code>
-                                                </TooltipTrigger>
-                                                <TooltipContent>
-                                                    <p>Used for provably fair verification</p>
-                                                </TooltipContent>
-                                            </Tooltip>
-                                        </TooltipProvider>
-                                    </div>
+                                    {activity.nonce ?
+                                        <>
+                                            <div className="flex items-center gap-2 text-xs">
+                                                <span className="text-gray-400">Nonce:</span>
+                                                <TooltipProvider>
+                                                    <Tooltip>
+                                                        <TooltipTrigger asChild>
+                                                            <code className="text-gray-300">{activity.nonce}</code>
+                                                        </TooltipTrigger>
+                                                        <TooltipContent>
+                                                            <p>Used for provably fair verification</p>
+                                                        </TooltipContent>
+                                                    </Tooltip>
+                                                </TooltipProvider>
+                                            </div>
+                                        </> :
+                                        <>
+                                            <div className="flex items-center gap-2 text-xs">
+                                                <span className="text-gray-400">Nonce Hash:</span>
+                                                <TooltipProvider>
+                                                    <Tooltip>
+                                                        <TooltipTrigger asChild>
+                                                            <code className="text-gray-300">{activity.nonce_hash}</code>
+                                                        </TooltipTrigger>
+                                                        <TooltipContent>
+                                                            <p>Used for provably fair verification</p>
+                                                        </TooltipContent>
+                                                    </Tooltip>
+                                                </TooltipProvider>
+                                            </div>
+                                        </>
+                                    }
                                 </div>
 
                                 <Separator className="bg-gray-700 mt-2"/>

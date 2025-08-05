@@ -9,6 +9,7 @@ use axum::{
 };
 use serde::{Deserialize, Serialize};
 use serde_json::{Value, json};
+use sha2::{Digest, Sha256};
 use sqlx::{Pool, Sqlite};
 use std::sync::Arc;
 use tokio::net::TcpListener;
@@ -27,6 +28,7 @@ pub struct AppState {
     pub ark_client: Arc<ArkClient>,
     pub pool: Pool<Sqlite>,
     pub broadcaster: SharedBroadcaster,
+    pub nonce_service: crate::nonce_service::NonceService,
 }
 
 #[derive(Serialize)]
@@ -47,6 +49,7 @@ struct PaginationQuery {
 #[derive(Serialize, Clone)]
 pub struct GameHistoryItem {
     pub id: String,
+    // TODO: make this a timestamp
     pub time_ago: String,
     pub amount_sent: String,
     pub multiplier: f64,
@@ -56,7 +59,8 @@ pub struct GameHistoryItem {
     pub payout: String,
     pub input_tx_id: String,
     pub output_tx_id: Option<String>,
-    pub nonce: String,
+    pub nonce: Option<String>, // Actual nonce, only revealed after new nonce is generated
+    pub nonce_hash: String,    // Always provided for verification
     pub timestamp: String,
 }
 
@@ -78,14 +82,15 @@ pub async fn start_server(ark_client: ArkClient, port: u16, pool: Pool<Sqlite>) 
     // Create WebSocket broadcaster
     let broadcaster = Arc::new(tokio::sync::RwLock::new(WebSocketBroadcaster::new()));
 
+    // Start nonce service (generate new nonce every 24 hours)
+    let nonce_service = spawn_nonce_service(pool.clone(), 1, 1).await;
+
     let state = AppState {
         ark_client: ark_client_arc.clone(),
         pool: pool.clone(),
         broadcaster: broadcaster.clone(),
+        nonce_service: nonce_service.clone(),
     };
-
-    // Start nonce service (generate new nonce every 24 hours)
-    let nonce_service = spawn_nonce_service(pool.clone(), 1, 1).await;
 
     // Start transaction monitoring in background
     spawn_transaction_monitor(
@@ -209,37 +214,48 @@ async fn get_games(
 
     let now = time::OffsetDateTime::now_utc();
 
-    let game_items: Vec<GameHistoryItem> = games
-        .into_iter()
-        .map(|game| {
-            let time_diff = now - game.timestamp;
-            let time_ago = format_time_ago(time_diff);
+    let mut game_items: Vec<GameHistoryItem> = Vec::new();
 
-            let target_number = (65536.0 * 1000.0 / game.multiplier as f64) as i64;
+    for game in games {
+        let time_diff = now - game.timestamp;
+        let time_ago = format_time_ago(time_diff);
 
-            GameHistoryItem {
-                id: game.id.to_string(),
-                time_ago,
-                amount_sent: format!("{:.8} BTC", game.bet_amount as f64 / 100_000_000.0),
-                multiplier: game.multiplier as f64 / 1000.0,
-                result_number: game.rolled_number,
-                target_number,
-                is_win: game.is_winner,
-                payout: if game.is_winner {
-                    format!(
-                        "{:.8} BTC",
-                        game.winning_amount.unwrap_or(0) as f64 / 100_000_000.0
-                    )
-                } else {
-                    "0 BTC".to_string()
-                },
-                input_tx_id: game.input_tx_id,
-                output_tx_id: game.output_tx_id,
-                nonce: game.nonce,
-                timestamp: game.timestamp.to_string(),
-            }
-        })
-        .collect();
+        let target_number = (65536.0 * 1000.0 / game.multiplier as f64) as i64;
+
+        let revealable_nonce = state.nonce_service.get_revealable_nonce(&game.nonce).await;
+        let nonce_hash = if revealable_nonce.is_some() {
+            // If we can reveal the nonce, calculate its hash for verification
+            let mut hasher = Sha256::new();
+            hasher.update(&game.nonce);
+            format!("{:x}", hasher.finalize())
+        } else {
+            // If we can't reveal it, it's the current nonce, so get its hash
+            state.nonce_service.get_current_nonce_hash().await
+        };
+
+        game_items.push(GameHistoryItem {
+            id: game.id.to_string(),
+            time_ago,
+            amount_sent: format!("{:.8} BTC", game.bet_amount as f64 / 100_000_000.0),
+            multiplier: game.multiplier as f64 / 1000.0,
+            result_number: game.rolled_number,
+            target_number,
+            is_win: game.is_winner,
+            payout: if game.is_winner {
+                format!(
+                    "{:.8} BTC",
+                    game.winning_amount.unwrap_or(0) as f64 / 100_000_000.0
+                )
+            } else {
+                "0 BTC".to_string()
+            },
+            input_tx_id: game.input_tx_id,
+            output_tx_id: game.output_tx_id,
+            nonce: revealable_nonce,
+            nonce_hash,
+            timestamp: game.timestamp.to_string(),
+        });
+    }
 
     Ok(Json(GameHistoryResponse {
         games: game_items,
@@ -311,36 +327,47 @@ async fn handle_websocket(socket: axum::extract::ws::WebSocket, state: AppState)
     match get_game_results_paginated(&state.pool, 1, 20).await {
         Ok(games) => {
             let now = time::OffsetDateTime::now_utc();
-            let game_items: Vec<GameHistoryItem> = games
-                .into_iter()
-                .map(|game| {
-                    let time_diff = now - game.timestamp;
-                    let time_ago = format_time_ago(time_diff);
-                    let target_number = (65536.0 * 1000.0 / game.multiplier as f64) as i64;
+            let mut game_items: Vec<GameHistoryItem> = Vec::new();
 
-                    GameHistoryItem {
-                        id: game.id.to_string(),
-                        time_ago,
-                        amount_sent: format!("{:.8} BTC", game.bet_amount as f64 / 100_000_000.0),
-                        multiplier: game.multiplier as f64 / 1000.0,
-                        result_number: game.rolled_number,
-                        target_number,
-                        is_win: game.is_winner,
-                        payout: if game.is_winner {
-                            format!(
-                                "{:.8} BTC",
-                                game.winning_amount.unwrap_or(0) as f64 / 100_000_000.0
-                            )
-                        } else {
-                            "0 BTC".to_string()
-                        },
-                        input_tx_id: game.input_tx_id,
-                        output_tx_id: game.output_tx_id,
-                        nonce: game.nonce,
-                        timestamp: game.timestamp.to_string(),
-                    }
-                })
-                .collect();
+            for game in games {
+                let time_diff = now - game.timestamp;
+                let time_ago = format_time_ago(time_diff);
+                let target_number = (65536.0 * 1000.0 / game.multiplier as f64) as i64;
+
+                let revealable_nonce = state.nonce_service.get_revealable_nonce(&game.nonce).await;
+                let nonce_hash = if revealable_nonce.is_some() {
+                    // If we can reveal the nonce, calculate its hash for verification
+                    let mut hasher = Sha256::new();
+                    hasher.update(&game.nonce);
+                    format!("{:x}", hasher.finalize())
+                } else {
+                    // If we can't reveal it, it's the current nonce, so get its hash
+                    state.nonce_service.get_current_nonce_hash().await
+                };
+
+                game_items.push(GameHistoryItem {
+                    id: game.id.to_string(),
+                    time_ago,
+                    amount_sent: format!("{:.8} BTC", game.bet_amount as f64 / 100_000_000.0),
+                    multiplier: game.multiplier as f64 / 1000.0,
+                    result_number: game.rolled_number,
+                    target_number,
+                    is_win: game.is_winner,
+                    payout: if game.is_winner {
+                        format!(
+                            "{:.8} BTC",
+                            game.winning_amount.unwrap_or(0) as f64 / 100_000_000.0
+                        )
+                    } else {
+                        "0 BTC".to_string()
+                    },
+                    input_tx_id: game.input_tx_id,
+                    output_tx_id: game.output_tx_id,
+                    nonce: revealable_nonce,
+                    nonce_hash,
+                    timestamp: game.timestamp.to_string(),
+                });
+            }
 
             // Send initial history
             let history_msg = json!({

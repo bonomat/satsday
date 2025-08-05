@@ -8,9 +8,9 @@ use time;
 use tokio::time::{Duration, sleep};
 
 use crate::key_derivation::Multiplier;
-use crate::{ArkClient, db, nonce_service::NonceService};
-use crate::websocket::SharedBroadcaster;
 use crate::server::GameHistoryItem;
+use crate::websocket::SharedBroadcaster;
+use crate::{ArkClient, db, nonce_service::NonceService};
 
 pub struct TransactionProcessor {
     ark_client: Arc<ArkClient>,
@@ -68,10 +68,7 @@ impl TransactionProcessor {
                 match (is_tx_processed, is_own_tx) {
                     (Ok(false), Ok(false)) => {
                         tracing::debug!(tx_id, "Processing new transaction");
-                        
-                        // Broadcast pending game message immediately
-                        self.broadcast_pending_game(multiplier, outpoint).await;
-                        
+
                         self.process_spendable_outpoint(multiplier, outpoint)
                             .await?;
                     }
@@ -94,32 +91,6 @@ impl TransactionProcessor {
         }
 
         Ok(())
-    }
-
-    async fn broadcast_pending_game(&self, multiplier: &Multiplier, outpoint: &VirtualTxOutPoint) {
-        let current_nonce = self.nonce_service.get_current_nonce().await;
-        let input_amount = outpoint.amount.to_sat();
-        let now = time::OffsetDateTime::now_utc();
-        
-        let pending_game = GameHistoryItem {
-            id: format!("pending-{}", outpoint.outpoint.txid),
-            time_ago: "processing...".to_string(),
-            amount_sent: format!("{:.8} BTC", input_amount as f64 / 100_000_000.0),
-            multiplier: multiplier.multiplier() as f64 / 1000.0,
-            result_number: -1, // Indicates pending
-            target_number: (65536.0 * 1000.0 / multiplier.multiplier() as f64) as i64,
-            is_win: false, // Will be updated when processed
-            payout: "pending...".to_string(),
-            input_tx_id: outpoint.outpoint.txid.to_string(),
-            output_tx_id: None,
-            nonce: current_nonce.to_string(),
-            timestamp: now.to_string(),
-        };
-        
-        let broadcaster = self.broadcaster.read().await;
-        if let Err(e) = broadcaster.broadcast_game_result(pending_game) {
-            tracing::error!("Failed to broadcast pending game: {}", e);
-        }
     }
 
     async fn broadcast_game_result(&self, game: GameHistoryItem) {
@@ -219,27 +190,37 @@ impl TransactionProcessor {
                             multiplier.multiplier() as i64,
                         )
                         .await;
-                        
+
                         if let Err(e) = game_result {
                             tracing::error!("Failed to store game result: {}", e);
                         } else {
                             // Broadcast the game result
                             let now = time::OffsetDateTime::now_utc();
+                            let nonce_str = current_nonce.to_string();
+                            let revealable_nonce =
+                                self.nonce_service.get_revealable_nonce(&nonce_str).await;
+                            let nonce_hash = self.nonce_service.get_current_nonce_hash().await;
+
                             let game_item = GameHistoryItem {
                                 id: "latest".to_string(), // This will be replaced by actual ID from DB
                                 time_ago: "just now".to_string(),
-                                amount_sent: format!("{:.8} BTC", input_amount as f64 / 100_000_000.0),
+                                amount_sent: format!(
+                                    "{:.8} BTC",
+                                    input_amount as f64 / 100_000_000.0
+                                ),
                                 multiplier: multiplier.multiplier() as f64 / 1000.0,
                                 result_number: rolled_number,
-                                target_number: (65536.0 * 1000.0 / multiplier.multiplier() as f64) as i64,
+                                target_number: (65536.0 * 1000.0 / multiplier.multiplier() as f64)
+                                    as i64,
                                 is_win: true,
                                 payout: format!("{:.8} BTC", payout as f64 / 100_000_000.0),
                                 input_tx_id: outpoint.outpoint.txid.to_string(),
                                 output_tx_id: Some(txid.to_string()),
-                                nonce: current_nonce.to_string(),
+                                nonce: revealable_nonce,
+                                nonce_hash,
                                 timestamp: now.to_string(),
                             };
-                            
+
                             self.broadcast_game_result(game_item).await;
                         }
                     }
@@ -272,12 +253,17 @@ impl TransactionProcessor {
                     multiplier.multiplier() as i64,
                 )
                 .await;
-                
+
                 if let Err(e) = game_result {
                     tracing::error!("Failed to store game result: {}", e);
                 } else {
                     // Broadcast the game result
                     let now = time::OffsetDateTime::now_utc();
+                    let nonce_str = current_nonce.to_string();
+                    let revealable_nonce =
+                        self.nonce_service.get_revealable_nonce(&nonce_str).await;
+                    let nonce_hash = self.nonce_service.get_current_nonce_hash().await;
+
                     let game_item = GameHistoryItem {
                         id: "latest".to_string(), // This will be replaced by actual ID from DB
                         time_ago: "just now".to_string(),
@@ -289,10 +275,11 @@ impl TransactionProcessor {
                         payout: "0 BTC".to_string(),
                         input_tx_id: outpoint.outpoint.txid.to_string(),
                         output_tx_id: None,
-                        nonce: current_nonce.to_string(),
+                        nonce: revealable_nonce,
+                        nonce_hash,
                         timestamp: now.to_string(),
                     };
-                    
+
                     self.broadcast_game_result(game_item).await;
                 }
             }
