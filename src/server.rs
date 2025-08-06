@@ -129,6 +129,7 @@ pub async fn start_server(ark_client: ArkClient, port: u16, pool: Pool<Sqlite>) 
         "http://localhost:12346".parse::<HeaderValue>()?,
         "http://localhost:12347".parse::<HeaderValue>()?,
         "https://satsday.xyz".parse::<HeaderValue>()?,
+        "https://mutinynet.satsday.xyz".parse::<HeaderValue>()?,
         "https://signet.satsday.xyz".parse::<HeaderValue>()?,
     ]);
 
