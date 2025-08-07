@@ -1,4 +1,6 @@
+use crate::server::DonationItem;
 use crate::server::GameHistoryItem;
+use crate::server::WebSocketMessage;
 use std::sync::Arc;
 use tokio::sync::broadcast;
 use tokio::sync::RwLock;
@@ -18,13 +20,22 @@ impl WebSocketBroadcaster {
         self.tx.subscribe()
     }
 
-    pub fn broadcast_game_result(&self, game: GameHistoryItem) -> Result<(), String> {
-        let message = serde_json::to_string(&game)
-            .map_err(|e| format!("Failed to serialize game result: {}", e))?;
+    pub fn broadcast_message(&self, message: WebSocketMessage) -> Result<(), String> {
+        let json_message = serde_json::to_string(&message)
+            .map_err(|e| format!("Failed to serialize websocket message: {}", e))?;
 
         // Ignore send errors (no receivers)
-        let _ = self.tx.send(message);
+        let _ = self.tx.send(json_message);
         Ok(())
+    }
+
+    // Backward compatibility method
+    pub fn broadcast_game_result(&self, game: GameHistoryItem) -> Result<(), String> {
+        self.broadcast_message(WebSocketMessage::GameResult(game))
+    }
+
+    pub fn broadcast_donation(&self, donation: DonationItem) -> Result<(), String> {
+        self.broadcast_message(WebSocketMessage::Donation(donation))
     }
 
     pub fn receiver_count(&self) -> usize {

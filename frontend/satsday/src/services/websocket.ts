@@ -1,13 +1,52 @@
 import { GameHistoryItem } from "./api";
 
-export interface WebSocketMessage {
-  type: "history" | "update";
-  games?: GameHistoryItem[];
-  game?: GameHistoryItem;
+export interface DonationItem {
+  id: string;
+  amount: number;
+  sender: string;
+  input_tx_id: string;
+  timestamp: number;
 }
 
+// Legacy websocket message format (for history)
+export interface LegacyWebSocketMessage {
+  type: "history";
+  games: GameHistoryItem[];
+}
+
+// New backend websocket message format
+export interface BackendWebSocketMessage {
+  type: "game_result";
+  id: string;
+  amount_sent: number;
+  multiplier: number;
+  result_number: number;
+  target_number: number;
+  is_win: boolean;
+  payout?: number;
+  input_tx_id: string;
+  output_tx_id: string | null;
+  nonce?: string;
+  nonce_hash: string;
+  timestamp: number;
+}
+
+export interface DonationWebSocketMessage {
+  type: "donation";
+  id: string;
+  amount: number;
+  sender: string;
+  input_tx_id: string;
+  timestamp: number;
+}
+
+export type WebSocketMessage =
+  | LegacyWebSocketMessage
+  | BackendWebSocketMessage
+  | DonationWebSocketMessage;
+
 export type WebSocketCallback = (
-  data: GameHistoryItem | GameHistoryItem[],
+  data: GameHistoryItem | GameHistoryItem[] | DonationItem,
 ) => void;
 export type ConnectionCallback = (connected: boolean) => void;
 
@@ -65,15 +104,39 @@ class GameWebSocketService {
 
       this.ws.onmessage = (event) => {
         try {
-          const data = JSON.parse(event.data);
+          const data: WebSocketMessage = JSON.parse(event.data);
 
-          if (data.type === "history" && data.games) {
+          if (data.type === "history") {
             // Initial history load
             this.cachedHistory = data.games;
             this.notifySubscribers(data.games);
-          } else {
-            // Real-time update - single game
-            this.notifySubscribers(data);
+          } else if (data.type === "game_result") {
+            // Real-time game result - convert to GameHistoryItem format
+            const gameItem: GameHistoryItem = {
+              id: data.id,
+              amount_sent: data.amount_sent,
+              multiplier: data.multiplier,
+              result_number: data.result_number,
+              target_number: data.target_number,
+              is_win: data.is_win,
+              payout: data.payout,
+              input_tx_id: data.input_tx_id,
+              output_tx_id: data.output_tx_id,
+              nonce: data.nonce,
+              nonce_hash: data.nonce_hash,
+              timestamp: data.timestamp,
+            };
+            this.notifySubscribers(gameItem);
+          } else if (data.type === "donation") {
+            // Real-time donation notification
+            const donationItem: DonationItem = {
+              id: data.id,
+              amount: data.amount,
+              sender: data.sender,
+              input_tx_id: data.input_tx_id,
+              timestamp: data.timestamp,
+            };
+            this.notifySubscribers(donationItem);
           }
         } catch (error) {
           console.error("Failed to parse WebSocket message:", error);
@@ -101,7 +164,9 @@ class GameWebSocketService {
     }
   }
 
-  private notifySubscribers(data: GameHistoryItem | GameHistoryItem[]): void {
+  private notifySubscribers(
+    data: GameHistoryItem | GameHistoryItem[] | DonationItem,
+  ): void {
     this.messageCallbacks.forEach((callback) => {
       callback(data);
     });
@@ -167,6 +232,25 @@ class GameWebSocketService {
   public isConnected(): boolean {
     return this.ws?.readyState === WebSocket.OPEN;
   }
+}
+
+// Helper functions to distinguish message types
+export function isDonation(
+  data: GameHistoryItem | GameHistoryItem[] | DonationItem,
+): data is DonationItem {
+  return !Array.isArray(data) && "sender" in data && !("multiplier" in data);
+}
+
+export function isGameHistoryArray(
+  data: GameHistoryItem | GameHistoryItem[] | DonationItem,
+): data is GameHistoryItem[] {
+  return Array.isArray(data);
+}
+
+export function isGameHistoryItem(
+  data: GameHistoryItem | GameHistoryItem[] | DonationItem,
+): data is GameHistoryItem {
+  return !Array.isArray(data) && "multiplier" in data;
 }
 
 // Create singleton instance

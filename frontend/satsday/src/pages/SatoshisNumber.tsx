@@ -61,6 +61,20 @@ export default function SatoshisNumber() {
     }
   };
 
+  // Calculate max amount that can be sent before it becomes a donation
+  const calculateMaxSendAmount = (multiplierValue: number) => {
+    const maxPayoutSats = parseInt(
+      import.meta.env.VITE_MAX_PAYOUT_SATS || "100000",
+    );
+    // Max payout = input_amount * multiplier / 100
+    // So: max_input_amount = max_payout * 100 / multiplier
+    return Math.floor((maxPayoutSats * 100) / multiplierValue);
+  };
+
+  const maxSendAmount = selectedAddress
+    ? calculateMaxSendAmount(selectedAddress.multiplier_value)
+    : 0;
+
   if (isLoading) {
     return (
       <div className="min-h-screen bg-background">
@@ -218,12 +232,32 @@ export default function SatoshisNumber() {
                   </div>
 
                   {/* Instructions */}
-                  <div className="text-sm text-muted-foreground max-w-md mx-auto">
-                    Send Bitcoin to the address above, then roll the dice. If
-                    the result is {selectedAddress?.max_roll || betNumber[0]} or
-                    lower, you win{" "}
-                    {selectedAddress?.multiplier || `${betDetails.multiplier}x`}{" "}
-                    your bet!
+                  <div className="text-sm text-muted-foreground max-w-md mx-auto space-y-3">
+                    <p>
+                      Send Bitcoin to the address above, then roll the dice. If
+                      the result is {selectedAddress?.max_roll || betNumber[0]}{" "}
+                      or lower, you win{" "}
+                      {selectedAddress?.multiplier ||
+                        `${betDetails.multiplier}x`}{" "}
+                      your bet!
+                    </p>
+
+                    {maxSendAmount > 0 && (
+                      <div className="bg-card/50 border border-border/50 rounded-lg p-3">
+                        <p className="text-xs font-medium text-muted-foreground mb-1">
+                          💡 Donation Threshold
+                        </p>
+                        <p className="text-xs">
+                          Amounts over{" "}
+                          <span className="font-semibold text-foreground">
+                            {maxSendAmount.toLocaleString()} sats
+                          </span>{" "}
+                          will be treated as donations and won't participate in
+                          the game. This helps us manage risk while still
+                          accepting generous contributions! 💖
+                        </p>
+                      </div>
+                    )}
                   </div>
                 </div>
               </div>

@@ -1,6 +1,7 @@
 use crate::db;
 use crate::key_derivation::Multiplier;
 use crate::nonce_service::NonceService;
+use crate::server::DonationItem;
 use crate::server::GameHistoryItem;
 use crate::websocket::SharedBroadcaster;
 use crate::ArkClient;
@@ -104,6 +105,13 @@ impl TransactionProcessor {
         }
     }
 
+    async fn broadcast_donation(&self, donation: DonationItem) {
+        let broadcaster = self.broadcaster.read().await;
+        if let Err(e) = broadcaster.broadcast_donation(donation) {
+            tracing::error!("Failed to broadcast donation: {}", e);
+        }
+    }
+
     async fn process_spendable_outpoint(
         &self,
         multiplier: &Multiplier,
@@ -139,6 +147,55 @@ impl TransactionProcessor {
             // Dice game logic using current nonce
             let current_nonce = self.nonce_service.get_current_nonce().await;
             let input_amount = outpoint.amount.to_sat();
+
+            // Check if potential payout exceeds maximum allowed
+            let max_allowed_payout = std::env::var("MAX_PAYOUT_SATS")
+                .unwrap_or_else(|_| "100000".to_string())
+                .parse::<u64>()
+                .unwrap_or(100_000u64);
+            let potential_payout = (input_amount * multiplier.multiplier()) / 100;
+
+            if potential_payout > max_allowed_payout {
+                tracing::info!(
+                    input_amount = input_amount,
+                    potential_payout = potential_payout,
+                    max_allowed = max_allowed_payout,
+                    sender = sender,
+                    "💝 Received donation - amount exceeds max payout limit"
+                );
+
+                // Store as donation in database
+                if let Err(e) = db::insert_game_result(
+                    &self.db_pool,
+                    &current_nonce.to_string(),
+                    -1, // Special value to indicate donation
+                    &outpoint.outpoint.txid.to_string(),
+                    None,
+                    input_amount as i64,
+                    None,
+                    &sender,
+                    false, // Not a win
+                    false, // Not processed as game
+                    multiplier.multiplier() as i64,
+                )
+                .await
+                {
+                    tracing::error!("Failed to store donation: {}", e);
+                } else {
+                    // Broadcast donation notification via websocket
+                    let donation_item = DonationItem {
+                        id: format!("donation-{}", outpoint.outpoint.txid),
+                        amount: Amount::from_sat(input_amount),
+                        sender: sender.clone(),
+                        input_tx_id: outpoint.outpoint.txid.to_string(),
+                        timestamp: time::OffsetDateTime::now_utc(),
+                    };
+
+                    self.broadcast_donation(donation_item).await;
+                }
+
+                continue; // Skip game processing for this transaction
+            }
 
             // Simple dice game: hash nonce + outpoint txid
             let hash_input = format!("{}{}", current_nonce, outpoint.outpoint.txid);

@@ -8,9 +8,11 @@ import {
   ExternalLink,
   Copy,
   CheckCircle,
+  Heart,
 } from "lucide-react";
-import { useState } from "react";
+import { useState, useMemo } from "react";
 import { useGameWebSocket } from "@/hooks/useGameWebSocket";
+import { DonationItem } from "@/services/websocket";
 import { Button } from "./ui/button";
 import {
   Tooltip,
@@ -20,13 +22,39 @@ import {
 } from "./ui/tooltip";
 import { formatDistanceToNow } from "date-fns";
 
+type FeedItem = {
+  type: "game" | "donation";
+  timestamp: number;
+  data: any;
+};
+
 const ActivityFeed = () => {
   const {
     activities,
+    donations,
     isConnected: wsConnected,
     isLoading: loading,
   } = useGameWebSocket(20);
   const [copiedTxId, setCopiedTxId] = useState<string | null>(null);
+
+  // Combine and sort activities and donations by timestamp
+  const combinedFeed = useMemo(() => {
+    const gameItems: FeedItem[] = activities.map((activity) => ({
+      type: "game" as const,
+      timestamp: activity.timestamp,
+      data: activity,
+    }));
+
+    const donationItems: FeedItem[] = donations.map((donation) => ({
+      type: "donation" as const,
+      timestamp: donation.timestamp,
+      data: donation,
+    }));
+
+    return [...gameItems, ...donationItems]
+      .sort((a, b) => b.timestamp - a.timestamp)
+      .slice(0, 20);
+  }, [activities, donations]);
 
   const copyToClipboard = async (text: string, txType: string) => {
     try {
@@ -40,6 +68,76 @@ const ActivityFeed = () => {
 
   const truncateTxId = (txId: string) => {
     return `${txId.slice(0, 6)}...${txId.slice(-6)}`;
+  };
+
+  const renderDonationItem = (donation: DonationItem) => {
+    const timeAgo = formatDistanceToNow(donation.timestamp * 1000);
+    return (
+      <div key={donation.id} className="space-y-2">
+        <div className="flex items-center justify-between">
+          <div className="flex items-center space-x-2">
+            <Clock className="h-4 w-4 text-gray-400" />
+            <span className="text-sm text-gray-400">{timeAgo} ago</span>
+          </div>
+          <Badge className="bg-pink-600 hover:bg-pink-700">
+            <Heart className="h-3 w-3 mr-1" />
+            DONATION
+          </Badge>
+        </div>
+
+        <div className="flex justify-between items-center">
+          <div>
+            <p className="text-sm font-medium text-gray-300">
+              Amount: <span className="text-white">{donation.amount} sats</span>
+            </p>
+            <p className="text-sm font-medium text-gray-300">
+              From:{" "}
+              <span className="text-white font-mono text-xs">
+                {donation.sender.length > 20
+                  ? `${donation.sender.slice(0, 10)}...${donation.sender.slice(-6)}`
+                  : donation.sender}
+              </span>
+            </p>
+          </div>
+          <div className="text-right">
+            <Heart className="h-8 w-8 text-pink-500 mx-auto mb-1" />
+            <p className="text-xs text-pink-400">Thank you!</p>
+          </div>
+        </div>
+
+        <div className="space-y-1">
+          <div className="flex items-center gap-2 text-xs">
+            <span className="text-gray-400">Donation TX:</span>
+            <TooltipProvider>
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    className="h-auto p-0 text-pink-400 hover:text-pink-300"
+                    onClick={() =>
+                      copyToClipboard(donation.input_tx_id, "donation")
+                    }
+                  >
+                    <code>{truncateTxId(donation.input_tx_id)}</code>
+                    {copiedTxId === `donation-${donation.input_tx_id}` ? (
+                      <CheckCircle className="h-3 w-3 ml-1" />
+                    ) : (
+                      <Copy className="h-3 w-3 ml-1" />
+                    )}
+                  </Button>
+                </TooltipTrigger>
+                <TooltipContent>
+                  <p>Click to copy: {donation.input_tx_id}</p>
+                </TooltipContent>
+              </Tooltip>
+            </TooltipProvider>
+          </div>
+        </div>
+
+        <Separator className="bg-gray-700 mt-2" />
+      </div>
+    );
   };
 
   if (loading) {
@@ -70,13 +168,18 @@ const ActivityFeed = () => {
       </div>
       <ScrollArea className="h-[400px]">
         <div className="space-y-4 pr-4">
-          {activities.length === 0 ? (
+          {combinedFeed.length === 0 ? (
             <div className="flex items-center justify-center h-[350px]">
-              <p className="text-gray-400">No games yet</p>
+              <p className="text-gray-400">No activity yet</p>
             </div>
           ) : (
-            activities.map((activity) => {
-              activity.timestamp;
+            combinedFeed.map((item) => {
+              if (item.type === "donation") {
+                return renderDonationItem(item.data);
+              }
+
+              // Game item rendering
+              const activity = item.data;
               const timeAgo = formatDistanceToNow(activity.timestamp * 1000);
               return (
                 <div key={activity.id} className="space-y-2">

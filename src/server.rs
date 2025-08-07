@@ -72,6 +72,24 @@ pub struct GameHistoryItem {
     pub timestamp: OffsetDateTime,
 }
 
+#[derive(Serialize, Clone)]
+pub struct DonationItem {
+    pub id: String,
+    #[serde(with = "bitcoin::amount::serde::as_sat")]
+    pub amount: Amount,
+    pub sender: String,
+    pub input_tx_id: String,
+    #[serde(with = "time::serde::timestamp")]
+    pub timestamp: OffsetDateTime,
+}
+
+#[derive(Serialize, Clone)]
+#[serde(tag = "type", rename_all = "snake_case")]
+pub enum WebSocketMessage {
+    GameResult(GameHistoryItem),
+    Donation(DonationItem),
+}
+
 #[derive(Serialize)]
 struct GameHistoryResponse {
     games: Vec<GameHistoryItem>,

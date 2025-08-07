@@ -13,11 +13,14 @@ export default function GameHero() {
               Every day is Satsday
             </span>
             <br />
-            <span className="text-foreground text-4xl">Provably Fair Bitcoin Games</span>
+            <span className="text-foreground text-4xl">
+              Provably Fair Bitcoin Games
+            </span>
           </h1>
 
           <p className="text-xl md:text-2xl text-muted-foreground max-w-3xl mx-auto leading-relaxed">
-            Experience transparent gaming powered by Ark. Every outcome is verifiable. Every game is provably fair. Every day is Satsday.
+            Experience transparent gaming powered by Ark. Every outcome is
+            verifiable. Every game is provably fair. Every day is Satsday.
           </p>
 
           <div className="flex flex-col sm:flex-row gap-4 justify-center items-center">
