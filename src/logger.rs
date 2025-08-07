@@ -18,6 +18,7 @@ pub fn init_tracing(level: LevelFilter, json_format: bool) -> Result<()> {
 
     let mut filter = EnvFilter::new("")
         .add_directive("sqlx::query=warn".parse()?)
+        .add_directive("ark_core::send=info".parse()?)
         .add_directive("hyper_util=warn".parse()?)
         .add_directive("h2=warn".parse()?)
         .add_directive("rustls=warn".parse()?)

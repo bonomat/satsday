@@ -836,6 +836,10 @@ impl ArkClient {
             .map(|a| (a.multiplier, a.vtxo.to_ark_address()))
             .collect()
     }
+
+    pub fn dust_value(&self) -> Amount {
+        self.server_info.dust
+    }
 }
 
 #[derive(Debug, Clone)]
