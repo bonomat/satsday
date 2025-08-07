@@ -60,7 +60,7 @@ impl TransactionProcessor {
     async fn check_for_new_transactions(&self) -> Result<()> {
         tracing::info!("Checking for new spendable VTXOs...");
 
-        let spendable_vtxos = self.ark_client.spendable_game_vtxos(false).await?;
+        let spendable_vtxos = self.ark_client.spendable_game_vtxos(true).await?;
 
         for (multiplier, outpoints) in &spendable_vtxos {
             for outpoint in outpoints {
