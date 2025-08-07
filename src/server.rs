@@ -119,16 +119,21 @@ pub async fn start_server(ark_client: ArkClient, port: u16, pool: Pool<Sqlite>) 
     };
 
     // Start transaction monitoring in background
+    let check_interval_seconds = std::env::var("TRANSACTION_CHECK_INTERVAL_SECONDS")
+        .unwrap_or_else(|_| "10".to_string())
+        .parse::<u64>()
+        .unwrap_or(10);
+    
     spawn_transaction_monitor(
         ark_client_arc,
         my_addresses,
-        10,
+        check_interval_seconds,
         nonce_service,
         pool,
         broadcaster,
     )
     .await;
-    println!("🔍 Transaction monitoring started (checking every 10 seconds)");
+    println!("🔍 Transaction monitoring started (checking every {} seconds)", check_interval_seconds);
 
     let cors = CorsLayer::new()
         .allow_credentials(true)
