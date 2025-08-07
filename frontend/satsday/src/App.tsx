@@ -7,6 +7,13 @@ import Index from "./pages/Index";
 import SatoshisNumber from "./pages/SatoshisNumber";
 import NotFound from "./pages/NotFound";
 
+// Initialize WebSocket connection early
+import { gameWebSocketService } from "./services/websocket";
+
+// Ensure WebSocket service is initialized
+// The connection will be established immediately when the app loads
+gameWebSocketService;
+
 const queryClient = new QueryClient();
 
 const App = () => (
