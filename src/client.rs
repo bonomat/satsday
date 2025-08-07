@@ -271,7 +271,6 @@ impl ArkClient {
         let (main_address, _) = &self.main_address;
         let change_address = main_address.to_ark_address();
 
-
         let OffchainTransactions {
             checkpoint_txs,
             mut ark_tx,
@@ -801,7 +800,12 @@ impl ArkClient {
                 }
                 Some(parent) => {
                     debug_assert!(parent.inputs.len() == 1);
-                    let option = parent.inputs.first().context("No parent found")?.witness_utxo.clone();
+                    let option = parent
+                        .inputs
+                        .first()
+                        .context("No parent found")?
+                        .witness_utxo
+                        .clone();
                     let txout =
                         option.ok_or_else(|| ark_core::Error::ad_hoc("Could not find input"))?;
                     let server_x_only = self.server_info.pk.x_only_public_key();

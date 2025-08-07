@@ -11,9 +11,9 @@ pub struct WebSocketBroadcaster {
 }
 
 impl Default for WebSocketBroadcaster {
- fn default() -> Self {
-     Self::new()
- }
+    fn default() -> Self {
+        Self::new()
+    }
 }
 
 impl WebSocketBroadcaster {

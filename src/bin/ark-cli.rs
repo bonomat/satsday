@@ -71,11 +71,14 @@ async fn main() -> Result<()> {
             let balance = client.get_balance().await?;
             tracing::info!(
                 "Offchain balance: spendable = {}, expired = {}",
-                balance.offchain_spendable, balance.offchain_expired
+                balance.offchain_spendable,
+                balance.offchain_expired
             );
             tracing::info!(
                 "Boarding balance: spendable = {}, expired = {}, pending = {}",
-                balance.boarding_spendable, balance.boarding_expired, balance.boarding_pending
+                balance.boarding_spendable,
+                balance.boarding_expired,
+                balance.boarding_pending
             );
         }
         Commands::Address => {

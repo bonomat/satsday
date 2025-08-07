@@ -123,7 +123,7 @@ pub async fn start_server(ark_client: ArkClient, port: u16, pool: Pool<Sqlite>) 
         .unwrap_or_else(|_| "10".to_string())
         .parse::<u64>()
         .unwrap_or(10);
-    
+
     spawn_transaction_monitor(
         ark_client_arc,
         my_addresses,
@@ -133,7 +133,9 @@ pub async fn start_server(ark_client: ArkClient, port: u16, pool: Pool<Sqlite>) 
         broadcaster,
     )
     .await;
-    tracing::info!("🔍 Transaction monitoring started (checking every {check_interval_seconds} seconds)", );
+    tracing::info!(
+        "🔍 Transaction monitoring started (checking every {check_interval_seconds} seconds)",
+    );
 
     let cors = CorsLayer::new()
         .allow_credentials(true)
