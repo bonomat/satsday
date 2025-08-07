@@ -62,7 +62,7 @@ deploy-frontend:
 
     # Build the frontend
     echo "📦 Building frontend..."
-    VITE_API_BASE_URL=https://api.satsday.xyz npm run build
+    VITE_API_BASE_URL=https://mutinynetapi.satsday.xyz npm run build
 
     npx wrangler pages deploy dist/ --project-name=satsday-xyz-signet --branch main
 
