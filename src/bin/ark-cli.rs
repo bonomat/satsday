@@ -55,56 +55,56 @@ async fn main() -> Result<()> {
     match cli.command {
         Commands::Start { port } => {
             let game_addresses = client.get_game_addresses();
-            println!("🎲 Starting Satoshi Dice server...");
-            println!("📍 Offchain address: {}", client.get_address());
-            println!("🚢 Boarding address: {}", client.get_boarding_address());
+            tracing::info!("🎲 Starting Satoshi Dice server...");
+            tracing::info!("📍 Offchain address: {}", client.get_address());
+            tracing::info!("🚢 Boarding address: {}", client.get_boarding_address());
             for (multiplier, address) in game_addresses {
-                println!("👾Game Address {}: {}", multiplier, address.encode());
+                tracing::info!("👾Game Address {}: {}", multiplier, address.encode());
             }
 
             let balance = client.get_balance().await?;
-            println!("💰 Balance: {:?}", balance);
+            tracing::info!("💰 Balance: {:?}", balance);
 
             satoshi_dice::server::start_server(client, port, pool).await?;
         }
         Commands::Balance => {
             let balance = client.get_balance().await?;
-            println!(
+            tracing::info!(
                 "Offchain balance: spendable = {}, expired = {}",
                 balance.offchain_spendable, balance.offchain_expired
             );
-            println!(
+            tracing::info!(
                 "Boarding balance: spendable = {}, expired = {}, pending = {}",
                 balance.boarding_spendable, balance.boarding_expired, balance.boarding_pending
             );
         }
         Commands::Address => {
-            println!("Offchain address: {}", client.get_address());
+            tracing::info!("Offchain address: {}", client.get_address());
         }
         Commands::GameAddresses => {
             let game_addresses = client.get_game_addresses();
             for (multiplier, address) in game_addresses {
-                println!("👾Game Address {}: {}", multiplier, address.encode());
+                tracing::info!("👾Game Address {}: {}", multiplier, address.encode());
             }
         }
         Commands::BoardingAddress => {
-            println!("Boarding address: {}", client.get_boarding_address());
+            tracing::info!("Boarding address: {}", client.get_boarding_address());
         }
         Commands::Send { address, amount } => {
             let ark_address = ark_core::ArkAddress::decode(&address)?;
             let amount = bitcoin::Amount::from_sat(amount);
-            let txid = client.send(&ark_address, amount).await?;
+            let txid = client.send(vec![(&ark_address, amount)]).await?;
 
-            println!("Sent {} to {} in transaction {}", amount, address, txid);
+            tracing::info!("Sent {} to {} in transaction {}", amount, address, txid);
             db::insert_own_transaction(&pool, txid.to_string().as_str(), "manual_send").await?;
         }
         Commands::Settle => match client.settle().await? {
             Some(txid) => {
-                println!("Settlement completed. Round TXID: {}", txid);
+                tracing::info!("Settlement completed. Round TXID: {}", txid);
                 db::insert_own_transaction(&pool, txid.to_string().as_str(), "consolidation")
                     .await?;
             }
-            None => println!("No boarding outputs or VTXOs to settle"),
+            None => tracing::info!("No boarding outputs or VTXOs to settle"),
         },
     }
 

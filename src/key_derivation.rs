@@ -117,9 +117,9 @@ impl std::fmt::Display for Multiplier {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         let value = self.multiplier() as f64 / 100.0;
         if value < 2.0 {
-            write!(f, "{:.2}x", value)
+            write!(f, "{value:.2}x")
         } else {
-            write!(f, "{:.0}x", value)
+            write!(f, "{value:.0}x")
         }
     }
 }

@@ -106,7 +106,7 @@ pub async fn start_server(ark_client: ArkClient, port: u16, pool: Pool<Sqlite>) 
     let my_addresses = vec![ark_client_arc.get_address()];
 
     // Create WebSocket broadcaster
-    let broadcaster = Arc::new(tokio::sync::RwLock::new(WebSocketBroadcaster::new()));
+    let broadcaster = Arc::new(tokio::sync::RwLock::new(WebSocketBroadcaster::default()));
 
     // Start nonce service (generate new nonce every 24 hours)
     let nonce_service = spawn_nonce_service(pool.clone(), 1, 1).await;
@@ -133,7 +133,7 @@ pub async fn start_server(ark_client: ArkClient, port: u16, pool: Pool<Sqlite>) 
         broadcaster,
     )
     .await;
-    println!("🔍 Transaction monitoring started (checking every {} seconds)", check_interval_seconds);
+    tracing::info!("🔍 Transaction monitoring started (checking every {check_interval_seconds} seconds)", );
 
     let cors = CorsLayer::new()
         .allow_credentials(true)
@@ -170,14 +170,14 @@ pub async fn start_server(ark_client: ArkClient, port: u16, pool: Pool<Sqlite>) 
     let addr = format!("0.0.0.0:{port}");
     let listener = TcpListener::bind(&addr).await?;
 
-    println!("🚀 Server starting on http://{addr}");
-    println!("📍 Address endpoint: http://{addr}/address");
-    println!("🚢 Boarding address endpoint: http://{addr}/boarding-address");
-    println!("🎮 Game addresses endpoint: http://{addr}/game-addresses");
-    println!("📊 Games history endpoint: http://{addr}/games");
-    println!("ℹ️ Version endpoint: http://{addr}/version");
-    println!("💰 Balance endpoint: http://{addr}/balance");
-    println!("🔌 WebSocket endpoint: ws://{addr}/ws");
+    tracing::info!("🚀 Server starting on http://{addr}");
+    tracing::info!("📍 Address endpoint: http://{addr}/address");
+    tracing::info!("🚢 Boarding address endpoint: http://{addr}/boarding-address");
+    tracing::info!("🎮 Game addresses endpoint: http://{addr}/game-addresses");
+    tracing::info!("📊 Games history endpoint: http://{addr}/games");
+    tracing::info!("ℹ️ Version endpoint: http://{addr}/version");
+    tracing::info!("💰 Balance endpoint: http://{addr}/balance");
+    tracing::info!("🔌 WebSocket endpoint: ws://{addr}/ws");
 
     axum::serve(listener, app).await?;
 

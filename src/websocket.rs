@@ -10,8 +10,14 @@ pub struct WebSocketBroadcaster {
     tx: broadcast::Sender<String>,
 }
 
+impl Default for WebSocketBroadcaster {
+ fn default() -> Self {
+     Self::new()
+ }
+}
+
 impl WebSocketBroadcaster {
-    pub fn new() -> Self {
+    fn new() -> Self {
         let (tx, _) = broadcast::channel(100);
         Self { tx }
     }
@@ -22,7 +28,7 @@ impl WebSocketBroadcaster {
 
     pub fn broadcast_message(&self, message: WebSocketMessage) -> Result<(), String> {
         let json_message = serde_json::to_string(&message)
-            .map_err(|e| format!("Failed to serialize websocket message: {}", e))?;
+            .map_err(|e| format!("Failed to serialize websocket message: {e}"))?;
 
         // Ignore send errors (no receivers)
         let _ = self.tx.send(json_message);

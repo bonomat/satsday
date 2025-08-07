@@ -36,7 +36,7 @@ pub fn init_tracing(level: LevelFilter, json_format: bool) -> Result<()> {
                 #[allow(clippy::print_stdout)]
                 match directive.parse() {
                     Ok(d) => filter = filter.add_directive(d),
-                    Err(e) => println!("WARN ignoring log directive: `{directive}`: {e}"),
+                    Err(e) => tracing::warn!("WARN ignoring log directive: `{directive}`: {e}"),
                 };
             }
             filter

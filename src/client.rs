@@ -810,7 +810,7 @@ impl ArkClient {
                 }
                 Some(parent) => {
                     debug_assert!(parent.inputs.len() == 1);
-                    let option = parent.inputs.first().unwrap().witness_utxo.clone();
+                    let option = parent.inputs.first().context("No parent found")?.witness_utxo.clone();
                     let txout =
                         option.ok_or_else(|| ark_core::Error::ad_hoc("Could not find input"))?;
                     let server_x_only = self.server_info.pk.x_only_public_key();
@@ -859,7 +859,7 @@ async fn get_address_from_output(
     let instruction = script.instructions();
     let mut enumerate = instruction.enumerate();
     let (_, res) = enumerate.nth(1).expect("No more instructions");
-    let instruction = res.unwrap();
+    let instruction = res.expect("to be correct");
     match instruction {
         bitcoin::script::Instruction::PushBytes(b) => {
             let vtxo_tap_key =

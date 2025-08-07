@@ -7,8 +7,8 @@ fn main() {
     let output = Command::new("git")
         .args(["rev-parse", "HEAD"])
         .output()
-        .unwrap();
-    let git_hash = String::from_utf8(output.stdout).unwrap();
+        .expect("to get a version");
+    let git_hash = String::from_utf8(output.stdout).expect("to be a string");
     println!("cargo:rustc-env=GIT_HASH={}", git_hash.trim());
 
     // Get current date and time
