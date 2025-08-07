@@ -224,7 +224,7 @@ impl TransactionProcessor {
                 );
 
                 // TODO: we should send to all addresses at the same time
-                match self.ark_client.send(&sender_address, payout_amount).await {
+                match self.ark_client.send(vec![(&sender_address, payout_amount)]).await {
                     Ok(txid) => {
                         tracing::debug!(txid = txid.to_string(), "🎉 Player won! Sent payout");
 

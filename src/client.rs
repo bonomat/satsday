@@ -189,7 +189,7 @@ impl ArkClient {
         })
     }
 
-    pub async fn send(&self, address: &ArkAddress, amount: Amount) -> Result<Txid> {
+    pub async fn send(&self, address_amounts: Vec<(&ArkAddress, Amount)>) -> Result<Txid> {
         let runtime = tokio::runtime::Handle::current();
         let find_outpoints_fn =
             |address: &bitcoin::Address| -> Result<Vec<ark_core::ExplorerUtxo>, ark_core::Error> {
@@ -220,27 +220,21 @@ impl ArkClient {
             })
             .collect::<Vec<_>>();
 
-        let selected_outpoints = if amount == Amount::ZERO {
+        let total_amount = address_amounts.iter().map(|(_, amount)| *amount).sum();
+
+        let selected_outpoints = if total_amount == Amount::ZERO {
             vtxo_outpoints
         } else {
-            select_vtxos(vtxo_outpoints, amount, self.server_info.dust, true)?
+            select_vtxos(vtxo_outpoints, total_amount, self.server_info.dust, true)?
         };
 
-        // Calculate the actual amount to send (total of selected outpoints when amount is 0)
-        let send_amount = if amount == Amount::ZERO {
-            selected_outpoints.iter().map(|o| o.amount).sum()
-        } else {
-            amount
-        };
-
-        self.send_with_outpoints(address, Some(send_amount), &selected_outpoints)
+        self.send_with_outpoints(address_amounts, &selected_outpoints)
             .await
     }
 
     pub async fn send_with_outpoints(
         &self,
-        address: &ArkAddress,
-        amount: Option<Amount>,
+        address_amounts: Vec<(&ArkAddress, Amount)>,
         specific_outpoints: &[ark_core::coin_select::VirtualTxOutPoint],
     ) -> Result<Txid> {
         let runtime = tokio::runtime::Handle::current();
@@ -277,15 +271,12 @@ impl ArkClient {
         let (main_address, _) = &self.main_address;
         let change_address = main_address.to_ark_address();
 
-        // Calculate the amount to send: either the provided amount or sum of all outpoints
-        let send_amount =
-            amount.unwrap_or_else(|| specific_outpoints.iter().map(|o| o.amount).sum());
 
         let OffchainTransactions {
             checkpoint_txs,
             mut ark_tx,
         } = build_offchain_transactions(
-            &[(address, send_amount)],
+            address_amounts.as_slice(),
             Some(&change_address),
             &vtxo_inputs,
             self.server_info.dust,
