@@ -72,17 +72,17 @@ impl TransactionProcessor {
 
                 match (is_tx_processed, is_own_tx) {
                     (Ok(false), Ok(false)) => {
-                        tracing::debug!(tx_id, "Processing new transaction");
+                        tracing::trace!(target : "tx_processor", tx_id, "Processing new transaction");
 
                         self.process_spendable_outpoint(multiplier, outpoint)
                             .await?;
                     }
                     (Ok(true), _) => {
-                        tracing::debug!(tx_id, "Transaction already processed, skipping");
+                        tracing::trace!(target : "tx_processor", tx_id, "Transaction already processed, skipping");
                         continue;
                     }
                     (_, Ok(true)) => {
-                        tracing::debug!(tx_id, "Own transaction, skipping");
+                        tracing::trace!(target : "tx_processor", tx_id, "Own transaction, skipping");
                         continue;
                     }
                     (Err(e), Ok(_)) => {
@@ -224,7 +224,7 @@ impl TransactionProcessor {
                 );
 
                 // TODO: we should send to all addresses at the same time
-                match self.ark_client.send(vec![(&sender_address, payout_amount)]).await {
+                match self.ark_client.send(vec![(&sender_address, payout_amount), (&sender_address, payout_amount)]).await {
                     Ok(txid) => {
                         tracing::debug!(txid = txid.to_string(), "🎉 Player won! Sent payout");
 
