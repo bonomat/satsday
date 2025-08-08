@@ -214,15 +214,12 @@ impl TransactionProcessor {
                 }));
             }
 
-            // Game logic: hash nonce + outpoint txid
-            let hash_input = format!("{}{}", current_nonce, outpoint.outpoint.txid);
-            let hash = bitcoin::hashes::sha256::Hash::hash(hash_input.as_bytes());
-            let hash_bytes = hash.as_byte_array();
-
-            // Use first 2 bytes as u16 for randomness (0-65535 range)
-            let random_value = u16::from_be_bytes([hash_bytes[0], hash_bytes[1]]);
-            let rolled_number = random_value as i64;
-            let player_wins = multiplier.is_win(random_value);
+            // Game logic
+            let (rolled_number, player_wins) = evaluate_game_outcome(
+                current_nonce,
+                &outpoint.outpoint.txid.to_string(),
+                multiplier,
+            );
 
             let payout_amount = if player_wins {
                 Some((input_amount * multiplier.multiplier()) / 100)
@@ -619,4 +616,253 @@ pub async fn spawn_transaction_monitor(
     tokio::spawn(async move {
         processor.start_monitoring().await;
     });
+}
+
+/// Evaluate game outcome based on nonce, transaction ID, and multiplier
+/// Returns (rolled_number, is_win)
+pub fn evaluate_game_outcome(nonce: u64, txid: &str, multiplier: &Multiplier) -> (i64, bool) {
+    // Hash nonce + txid
+    let hash_input = format!("{}{}", nonce, txid);
+    let hash = bitcoin::hashes::sha256::Hash::hash(hash_input.as_bytes());
+    let hash_bytes = hash.as_byte_array();
+
+    // Use first 2 bytes as u16 for randomness (0-65535 range)
+    let random_value = u16::from_be_bytes([hash_bytes[0], hash_bytes[1]]);
+    let rolled_number = random_value as i64;
+    let player_wins = multiplier.is_win(random_value);
+
+    (rolled_number, player_wins)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::key_derivation::Multiplier;
+    use rayon::prelude::*;
+    use std::collections::HashMap;
+
+    const TEST_ITERATIONS: usize = 1000;
+
+    fn run_multiplier_test(multiplier: Multiplier) -> (f64, f64, HashMap<&'static str, usize>) {
+        let results: Vec<bool> = (0..TEST_ITERATIONS)
+            .into_par_iter()
+            .map(|i| {
+                let nonce = i as u64;
+                let txid = format!("test_txid_{}", i);
+                let (_, is_win) = evaluate_game_outcome(nonce, &txid, &multiplier);
+                is_win
+            })
+            .collect();
+
+        let wins = results.iter().filter(|&&x| x).count();
+        let losses = results.iter().filter(|&&x| !x).count();
+
+        let actual_win_rate = (wins as f64 / TEST_ITERATIONS as f64) * 100.0;
+        let expected_win_rate = (multiplier.get_lower_than() as f64 / 65536.0) * 100.0;
+
+        let mut stats = HashMap::new();
+        stats.insert("wins", wins);
+        stats.insert("losses", losses);
+        stats.insert("total", TEST_ITERATIONS);
+
+        (actual_win_rate, expected_win_rate, stats)
+    }
+
+    fn print_test_results(
+        multiplier_name: &str,
+        multiplier_value: f64,
+        actual_win_rate: f64,
+        expected_win_rate: f64,
+        stats: HashMap<&'static str, usize>,
+    ) {
+        println!("\n=== {} ({}x) ===", multiplier_name, multiplier_value);
+        println!("Iterations: {}", stats["total"]);
+        println!("Wins: {} | Losses: {}", stats["wins"], stats["losses"]);
+        println!("Expected win rate: {:.2}%", expected_win_rate);
+        println!("Actual win rate: {:.2}%", actual_win_rate);
+        println!(
+            "Deviation: {:.2}%",
+            (actual_win_rate - expected_win_rate).abs()
+        );
+
+        let house_edge = 100.0 - (expected_win_rate * multiplier_value);
+        println!("House edge: {:.2}%", house_edge);
+
+        // Calculate profit/loss for 1000 sats per bet
+        let bet_amount = 1000i64;
+        let total_wagered = bet_amount * stats["total"] as i64;
+        let win_payout = (bet_amount as f64 * multiplier_value) as i64;
+        let player_return = stats["wins"] as i64 * win_payout;
+        let player_profit = player_return - total_wagered;
+        let house_profit = -player_profit;
+
+        println!("📊 If player bet 1000 sats per game:");
+        println!("   Total wagered: {} sats", total_wagered);
+        println!(
+            "   Player would have: {} sats ({})",
+            if player_profit >= 0 {
+                format!("+{}", player_profit)
+            } else {
+                player_profit.to_string()
+            },
+            if player_profit >= 0 { "profit" } else { "loss" }
+        );
+        println!(
+            "   House would have: {} sats ({})",
+            if house_profit >= 0 {
+                format!("+{}", house_profit)
+            } else {
+                house_profit.to_string()
+            },
+            if house_profit >= 0 { "profit" } else { "loss" }
+        );
+    }
+
+    #[test]
+    fn test_x105_multiplier() {
+        let multiplier = Multiplier::X105;
+        let (actual, expected, stats) = run_multiplier_test(multiplier);
+        print_test_results("X105", 1.05, actual, expected, stats);
+        assert!(
+            (actual - expected).abs() < 3.0,
+            "Win rate deviation too high"
+        );
+    }
+
+    #[test]
+    fn test_x110_multiplier() {
+        let multiplier = Multiplier::X110;
+        let (actual, expected, stats) = run_multiplier_test(multiplier);
+        print_test_results("X110", 1.10, actual, expected, stats);
+        assert!(
+            (actual - expected).abs() < 3.0,
+            "Win rate deviation too high"
+        );
+    }
+
+    #[test]
+    fn test_x133_multiplier() {
+        let multiplier = Multiplier::X133;
+        let (actual, expected, stats) = run_multiplier_test(multiplier);
+        print_test_results("X133", 1.33, actual, expected, stats);
+        assert!(
+            (actual - expected).abs() < 3.0,
+            "Win rate deviation too high"
+        );
+    }
+
+    #[test]
+    fn test_x150_multiplier() {
+        let multiplier = Multiplier::X150;
+        let (actual, expected, stats) = run_multiplier_test(multiplier);
+        print_test_results("X150", 1.50, actual, expected, stats);
+        assert!(
+            (actual - expected).abs() < 3.0,
+            "Win rate deviation too high"
+        );
+    }
+
+    #[test]
+    fn test_x200_multiplier() {
+        let multiplier = Multiplier::X200;
+        let (actual, expected, stats) = run_multiplier_test(multiplier);
+        print_test_results("X200", 2.00, actual, expected, stats);
+        assert!(
+            (actual - expected).abs() < 3.0,
+            "Win rate deviation too high"
+        );
+    }
+
+    #[test]
+    fn test_x300_multiplier() {
+        let multiplier = Multiplier::X300;
+        let (actual, expected, stats) = run_multiplier_test(multiplier);
+        print_test_results("X300", 3.00, actual, expected, stats);
+        assert!(
+            (actual - expected).abs() < 3.0,
+            "Win rate deviation too high"
+        );
+    }
+
+    #[test]
+    fn test_x1000_multiplier() {
+        let multiplier = Multiplier::X1000;
+        let (actual, expected, stats) = run_multiplier_test(multiplier);
+        print_test_results("X1000", 10.00, actual, expected, stats);
+        assert!(
+            (actual - expected).abs() < 3.0,
+            "Win rate deviation too high"
+        );
+    }
+
+    #[test]
+    fn test_x2500_multiplier() {
+        let multiplier = Multiplier::X2500;
+        let (actual, expected, stats) = run_multiplier_test(multiplier);
+        print_test_results("X2500", 25.00, actual, expected, stats);
+        assert!(
+            (actual - expected).abs() < 3.0,
+            "Win rate deviation too high"
+        );
+    }
+
+    #[test]
+    fn test_x5000_multiplier() {
+        let multiplier = Multiplier::X5000;
+        let (actual, expected, stats) = run_multiplier_test(multiplier);
+        print_test_results("X5000", 50.00, actual, expected, stats);
+        assert!(
+            (actual - expected).abs() < 3.0,
+            "Win rate deviation too high"
+        );
+    }
+
+    #[test]
+    fn test_x10000_multiplier() {
+        let multiplier = Multiplier::X10000;
+        let (actual, expected, stats) = run_multiplier_test(multiplier);
+        print_test_results("X10000", 100.00, actual, expected, stats);
+        assert!(
+            (actual - expected).abs() < 3.0,
+            "Win rate deviation too high"
+        );
+    }
+
+    #[test]
+    fn test_x100000_multiplier() {
+        let multiplier = Multiplier::X100000;
+        let (actual, expected, stats) = run_multiplier_test(multiplier);
+        print_test_results("X100000", 1000.00, actual, expected, stats);
+        // Allow higher deviation for very low probability events
+        assert!(
+            (actual - expected).abs() < 5.0,
+            "Win rate deviation too high"
+        );
+    }
+
+    #[test]
+    fn test_all_multipliers_summary() {
+        println!("\n========================================");
+        println!("COMPREHENSIVE MULTIPLIER TEST SUMMARY");
+        println!("========================================");
+
+        let multipliers = vec![
+            (Multiplier::X105, "X105", 1.05),
+            (Multiplier::X110, "X110", 1.10),
+            (Multiplier::X133, "X133", 1.33),
+            (Multiplier::X150, "X150", 1.50),
+            (Multiplier::X200, "X200", 2.00),
+            (Multiplier::X300, "X300", 3.00),
+            (Multiplier::X1000, "X1000", 10.00),
+            (Multiplier::X2500, "X2500", 25.00),
+            (Multiplier::X5000, "X5000", 50.00),
+            (Multiplier::X10000, "X10000", 100.00),
+            (Multiplier::X100000, "X100000", 1000.00),
+        ];
+
+        for (mult, name, value) in multipliers {
+            let (actual, expected, stats) = run_multiplier_test(mult);
+            print_test_results(name, value, actual, expected, stats);
+        }
+    }
 }
