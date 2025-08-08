@@ -2,12 +2,12 @@ use anyhow::Context;
 use anyhow::Result;
 use time::macros::format_description;
 use tracing::metadata::LevelFilter;
+use tracing_subscriber::EnvFilter;
+use tracing_subscriber::Layer;
 use tracing_subscriber::filter::Directive;
 use tracing_subscriber::fmt::time::UtcTime;
 use tracing_subscriber::layer::SubscriberExt;
 use tracing_subscriber::util::SubscriberInitExt;
-use tracing_subscriber::EnvFilter;
-use tracing_subscriber::Layer;
 
 const RUST_LOG_ENV: &str = "RUST_LOG";
 

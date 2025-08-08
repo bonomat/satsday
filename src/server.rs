@@ -1,11 +1,12 @@
+use crate::ArkClient;
 use crate::db::get_game_results_paginated;
 use crate::db::get_total_game_count;
 use crate::nonce_service::spawn_nonce_service;
 use crate::transaction_processor::spawn_transaction_monitor;
 use crate::websocket::SharedBroadcaster;
 use crate::websocket::WebSocketBroadcaster;
-use crate::ArkClient;
 use anyhow::Result;
+use axum::Router;
 use axum::extract::Query;
 use axum::extract::State;
 use axum::extract::WebSocketUpgrade;
@@ -15,17 +16,16 @@ use axum::http::StatusCode;
 use axum::response::Json;
 use axum::response::Response;
 use axum::routing::get;
-use axum::Router;
 use bitcoin::Amount;
 use serde::Deserialize;
 use serde::Serialize;
-use serde_json::json;
 use serde_json::Value;
+use serde_json::json;
 use sha2::Digest;
 use sha2::Sha256;
-use sqlx::types::time::OffsetDateTime;
 use sqlx::Pool;
 use sqlx::Sqlite;
+use sqlx::types::time::OffsetDateTime;
 use std::sync::Arc;
 use tokio::net::TcpListener;
 use tower_http::cors::CorsLayer;
@@ -99,7 +99,12 @@ struct GameHistoryResponse {
     total_pages: i64,
 }
 
-pub async fn start_server(ark_client: ArkClient, port: u16, pool: Pool<Sqlite>) -> Result<()> {
+pub async fn start_server(
+    ark_client: ArkClient,
+    port: u16,
+    pool: Pool<Sqlite>,
+    transaction_check_interval_seconds: u64,
+) -> Result<()> {
     let ark_client_arc = Arc::new(ark_client);
 
     // Get our addresses for transaction monitoring
@@ -119,22 +124,17 @@ pub async fn start_server(ark_client: ArkClient, port: u16, pool: Pool<Sqlite>) 
     };
 
     // Start transaction monitoring in background
-    let check_interval_seconds = std::env::var("TRANSACTION_CHECK_INTERVAL_SECONDS")
-        .unwrap_or_else(|_| "10".to_string())
-        .parse::<u64>()
-        .unwrap_or(10);
-
     spawn_transaction_monitor(
         ark_client_arc,
         my_addresses,
-        check_interval_seconds,
+        transaction_check_interval_seconds,
         nonce_service,
         pool,
         broadcaster,
     )
     .await;
     tracing::info!(
-        "🔍 Transaction monitoring started (checking every {check_interval_seconds} seconds)",
+        "🔍 Transaction monitoring started (checking every {transaction_check_interval_seconds} seconds)",
     );
 
     let cors = CorsLayer::new()

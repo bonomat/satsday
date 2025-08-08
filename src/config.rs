@@ -6,6 +6,12 @@ pub struct Config {
     pub esplora_url: String,
     pub master_seed_file: String,
     pub database: String,
+    #[serde(default = "default_transaction_check_interval")]
+    pub transaction_check_interval_seconds: u64,
+}
+
+fn default_transaction_check_interval() -> u64 {
+    10
 }
 
 impl Config {

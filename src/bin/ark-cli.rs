@@ -1,9 +1,9 @@
 use anyhow::Result;
 use clap::Parser;
-use satoshi_dice::db;
-use satoshi_dice::logger;
 use satoshi_dice::ArkClient;
 use satoshi_dice::Config;
+use satoshi_dice::db;
+use satoshi_dice::logger;
 use sqlx::migrate::Migrator;
 use sqlx::sqlite::SqlitePoolOptions;
 use tracing_subscriber::filter::LevelFilter;
@@ -50,6 +50,7 @@ async fn main() -> Result<()> {
     let pool = SqlitePoolOptions::new().connect(db_url.as_str()).await?;
     MIGRATOR.run(&pool).await?;
 
+    let transaction_check_interval = config.transaction_check_interval_seconds;
     let client = ArkClient::new(config).await?;
 
     match cli.command {
@@ -65,7 +66,8 @@ async fn main() -> Result<()> {
             let balance = client.get_balance().await?;
             tracing::info!("💰 Balance: {:?}", balance);
 
-            satoshi_dice::server::start_server(client, port, pool).await?;
+            satoshi_dice::server::start_server(client, port, pool, transaction_check_interval)
+                .await?;
         }
         Commands::Balance => {
             let balance = client.get_balance().await?;

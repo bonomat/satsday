@@ -1,21 +1,21 @@
+use crate::ArkClient;
 use crate::db;
 use crate::key_derivation::Multiplier;
 use crate::nonce_service::NonceService;
 use crate::server::DonationItem;
 use crate::server::GameHistoryItem;
 use crate::websocket::SharedBroadcaster;
-use crate::ArkClient;
 use anyhow::Result;
-use ark_core::server::VirtualTxOutPoint;
 use ark_core::ArkAddress;
-use bitcoin::hashes::Hash;
+use ark_core::server::VirtualTxOutPoint;
 use bitcoin::Amount;
+use bitcoin::hashes::Hash;
 use sqlx::Pool;
 use sqlx::Sqlite;
 use std::sync::Arc;
 use time;
-use tokio::time::sleep;
 use tokio::time::Duration;
+use tokio::time::sleep;
 
 #[derive(Debug, Clone)]
 struct GameResult {
@@ -81,6 +81,9 @@ impl TransactionProcessor {
         tracing::info!("Checking for new spendable VTXOs...");
 
         let spendable_vtxos = self.ark_client.spendable_game_vtxos(true).await?;
+        let total_vtxo:usize = spendable_vtxos.values().map(|v| v.len()).sum();
+        tracing::info!(total_vtxo, "Found spendable vtxos");
+
         let mut batch_result = BatchProcessingResult {
             winners: Vec::new(),
             losers: Vec::new(),
@@ -199,9 +202,9 @@ impl TransactionProcessor {
             let donation_threshold = self.get_donation_threshold(multiplier);
             if input_amount > donation_threshold {
                 return Ok(Some(GameResult {
-                    multiplier: multiplier.clone(),
+                    multiplier: *multiplier,
                     outpoint: outpoint.clone(),
-                    sender_address: sender_address.clone(),
+                    sender_address,
                     sender,
                     input_amount,
                     current_nonce,
@@ -228,9 +231,9 @@ impl TransactionProcessor {
             };
 
             return Ok(Some(GameResult {
-                multiplier: multiplier.clone(),
+                multiplier: *multiplier,
                 outpoint: outpoint.clone(),
-                sender_address: sender_address.clone(),
+                sender_address,
                 sender,
                 input_amount,
                 current_nonce,
@@ -403,7 +406,9 @@ impl TransactionProcessor {
                     );
 
                     if retry_count >= MAX_RETRIES {
-                        tracing::error!("🚨 Max retries exceeded for individual payout, processing as failed winner");
+                        tracing::error!(
+                            "🚨 Max retries exceeded for individual payout, processing as failed winner"
+                        );
                         self.process_winner_result(winner, None).await?;
                         break;
                     } else {
@@ -470,7 +475,9 @@ impl TransactionProcessor {
                     );
 
                     if retry_count >= MAX_RETRIES {
-                        tracing::error!("🚨 Max retries exceeded for batch payout, processing as failed winners");
+                        tracing::error!(
+                            "🚨 Max retries exceeded for batch payout, processing as failed winners"
+                        );
                         for winner in winners {
                             self.process_winner_result(winner, None).await?;
                         }

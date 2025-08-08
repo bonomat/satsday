@@ -4,6 +4,10 @@ set dotenv-load := true
 
 CONFIG_FILE := env_var_or_default('CONFIG_FILE', 'local.config.toml')
 
+mod mainnet
+mod mutiny
+mod signet
+
 fmt:
     just fmt-dprint
     just fmt-frontend
@@ -35,9 +39,6 @@ db-revert-migration:
 run:
     cargo run -- --config {{ CONFIG_FILE }} start -p 12345
 
-run-mutinynet:
-    cargo run -- --config mutinynet.config.toml start -p 12345
-
 balance:
     cargo run -- --config {{ CONFIG_FILE }} balance
 
@@ -52,32 +53,6 @@ game-addresses:
 
 send address amount:
     cargo run -- --config {{ CONFIG_FILE }} send {{ address }} {{ amount }}
-
-deploy-frontend-signet:
-    #!/bin/bash
-    set -e  # Exit on any error
-    cd frontend/satsday
-
-    echo "🚀 Starting deployment for satsday.xyz..."
-
-    # Build the frontend
-    echo "📦 Building frontend..."
-    VITE_API_BASE_URL=https://mutinynetapi.satsday.xyz npm run build
-
-    npx wrangler pages deploy dist/ --project-name=satsday-xyz-signet --branch main
-
-deploy-frontend-mainnet:
-    #!/bin/bash
-    set -e  # Exit on any error
-    cd frontend/satsday
-
-    echo "🚀 Starting deployment for satsday.xyz..."
-
-    # Build the frontend
-    echo "📦 Building frontend..."
-    VITE_API_BASE_URL=https://api.satsday.xyz npm run build
-
-    npx wrangler pages deploy dist/ --project-name=satsday-xyz --branch main
 
 run-frontend:
     #!/bin/bash

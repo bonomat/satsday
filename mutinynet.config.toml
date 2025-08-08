@@ -2,3 +2,4 @@ ark_server_url = "https://mutinynet.arkade.sh/v1"
 esplora_url = "https://mutinynet.com/api"
 master_seed_file = "./main_seed_file.seed"
 database = "./db.sqlite"
+transaction_check_interval_seconds = 10

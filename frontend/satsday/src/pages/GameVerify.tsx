@@ -12,15 +12,15 @@ import { toast } from "sonner";
 // SHA256 implementation for browser
 async function sha256(message: string): Promise<ArrayBuffer> {
   const msgBuffer = new TextEncoder().encode(message);
-  const hashBuffer = await crypto.subtle.digest('SHA-256', msgBuffer);
+  const hashBuffer = await crypto.subtle.digest("SHA-256", msgBuffer);
   return hashBuffer;
 }
 
 // Convert ArrayBuffer to hex string
 function bufferToHex(buffer: ArrayBuffer): string {
   return Array.from(new Uint8Array(buffer))
-    .map(b => b.toString(16).padStart(2, '0'))
-    .join('');
+    .map((b) => b.toString(16).padStart(2, "0"))
+    .join("");
 }
 
 interface VerificationResult {
@@ -36,24 +36,31 @@ interface VerificationResult {
 
 export default function GameVerify() {
   const [searchParams, setSearchParams] = useSearchParams();
-  const [txHash, setTxHash] = useState(searchParams.get('tx') || "");
-  const [nonce, setNonce] = useState(searchParams.get('nonce') || "");
-  const [multiplier, setMultiplier] = useState(searchParams.get('multiplier') || "");
-  const [verificationResult, setVerificationResult] = useState<VerificationResult | null>(null);
+  const [txHash, setTxHash] = useState(searchParams.get("tx") || "");
+  const [nonce, setNonce] = useState(searchParams.get("nonce") || "");
+  const [multiplier, setMultiplier] = useState(
+    searchParams.get("multiplier") || "",
+  );
+  const [verificationResult, setVerificationResult] =
+    useState<VerificationResult | null>(null);
   const [isVerifying, setIsVerifying] = useState(false);
 
   // Update URL params when form values change
   useEffect(() => {
     const params = new URLSearchParams();
-    if (txHash) params.set('tx', txHash);
-    if (nonce) params.set('nonce', nonce);
-    if (multiplier) params.set('multiplier', multiplier);
+    if (txHash) params.set("tx", txHash);
+    if (nonce) params.set("nonce", nonce);
+    if (multiplier) params.set("multiplier", multiplier);
     setSearchParams(params);
   }, [txHash, nonce, multiplier, setSearchParams]);
 
   // Auto-verify if all params are present on load
   useEffect(() => {
-    if (searchParams.get('tx') && searchParams.get('nonce') && searchParams.get('multiplier')) {
+    if (
+      searchParams.get("tx") &&
+      searchParams.get("nonce") &&
+      searchParams.get("multiplier")
+    ) {
       verifyGame();
     }
   }, []); // Only run on mount
@@ -74,13 +81,13 @@ export default function GameVerify() {
         multiplier: 0,
         winChance: 0,
         hashHex: "",
-        error: "Please fill in all fields"
+        error: "Please fill in all fields",
       });
       return;
     }
 
     setIsVerifying(true);
-    
+
     try {
       // Parse multiplier
       const multiplierValue = parseFloat(multiplier);
@@ -91,24 +98,26 @@ export default function GameVerify() {
       // Replicate the game logic from transaction_processor.rs
       // hash_input = format!("{}{}", current_nonce, outpoint.outpoint.txid);
       const hashInput = `${nonce}${txHash}`;
-      
+
       // SHA256 hash
       const hashBuffer = await sha256(hashInput);
       const hashBytes = new Uint8Array(hashBuffer);
       const hashHex = bufferToHex(hashBuffer);
-      
+
       // Use first 2 bytes as u16 for randomness (0-65535 range)
       // let random_value = u16::from_be_bytes([hash_bytes[0], hash_bytes[1]]);
       const randomValue = (hashBytes[0] << 8) | hashBytes[1]; // Big-endian u16
       const rolledNumber = randomValue;
-      
+
       // Calculate target number based on multiplier
       // From the frontend: target_number: (65536.0 * 1000.0 / multiplier.multiplier() as f64) as i64
-      const targetNumber = Math.floor((65536.0 * 1000.0) / (multiplierValue * 100));
-      
+      const targetNumber = Math.floor(
+        (65536.0 * 1000.0) / (multiplierValue * 100),
+      );
+
       // Check if player wins: rolled_number < target_number
       const isWin = rolledNumber < targetNumber;
-      
+
       // Calculate win chance percentage
       const winChance = (targetNumber / 65536) * 100;
 
@@ -119,7 +128,7 @@ export default function GameVerify() {
         isWin,
         multiplier: multiplierValue,
         winChance,
-        hashHex
+        hashHex,
       });
     } catch (error) {
       setVerificationResult({
@@ -130,7 +139,7 @@ export default function GameVerify() {
         multiplier: 0,
         winChance: 0,
         hashHex: "",
-        error: error instanceof Error ? error.message : "Verification failed"
+        error: error instanceof Error ? error.message : "Verification failed",
       });
     } finally {
       setIsVerifying(false);
@@ -148,8 +157,8 @@ export default function GameVerify() {
             Game Verification
           </h1>
           <p className="text-muted-foreground max-w-2xl mx-auto">
-            Verify any Satoshi Dice game result by providing the transaction hash and nonce. 
-            Our games are provably fair and fully transparent.
+            Verify any Satoshi Dice game result by providing the transaction
+            hash and nonce. Our games are provably fair and fully transparent.
           </p>
           <Link to="/game">
             <Button variant="ghost" size="sm">
@@ -194,7 +203,8 @@ export default function GameVerify() {
                     className="font-mono text-sm"
                   />
                   <p className="text-xs text-muted-foreground">
-                    The random nonce that was active when your game was processed
+                    The random nonce that was active when your game was
+                    processed
                   </p>
                 </div>
 
@@ -215,8 +225,8 @@ export default function GameVerify() {
                 </div>
               </div>
 
-              <Button 
-                onClick={verifyGame} 
+              <Button
+                onClick={verifyGame}
                 disabled={isVerifying}
                 className="w-full"
                 size="lg"
@@ -240,10 +250,12 @@ export default function GameVerify() {
                   <div>
                     <h4 className="font-semibold mb-1">Combine Inputs</h4>
                     <p className="text-sm text-muted-foreground">
-                      We concatenate the nonce + transaction hash to create a unique string:
+                      We concatenate the nonce + transaction hash to create a
+                      unique string:
                       {txHash && nonce && (
                         <code className="block mt-1 p-2 bg-card/50 rounded text-xs break-all">
-                          {nonce}{txHash}
+                          {nonce}
+                          {txHash}
                         </code>
                       )}
                     </p>
@@ -257,7 +269,9 @@ export default function GameVerify() {
                   <div>
                     <h4 className="font-semibold mb-1">SHA256 Hash</h4>
                     <p className="text-sm text-muted-foreground">
-                      The combined string is hashed using SHA256, creating a 32-byte (64 character) hash that's cryptographically secure and deterministic.
+                      The combined string is hashed using SHA256, creating a
+                      32-byte (64 character) hash that's cryptographically
+                      secure and deterministic.
                     </p>
                   </div>
                 </div>
@@ -267,9 +281,13 @@ export default function GameVerify() {
                     3
                   </div>
                   <div>
-                    <h4 className="font-semibold mb-1">Extract Random Number</h4>
+                    <h4 className="font-semibold mb-1">
+                      Extract Random Number
+                    </h4>
                     <p className="text-sm text-muted-foreground">
-                      We take the first 2 bytes of the hash and convert them to a number between 0-65535. This gives us a fair, unpredictable random number.
+                      We take the first 2 bytes of the hash and convert them to
+                      a number between 0-65535. This gives us a fair,
+                      unpredictable random number.
                     </p>
                   </div>
                 </div>
@@ -284,7 +302,8 @@ export default function GameVerify() {
                       Based on your multiplier, we calculate the target number:
                       {multiplier && (
                         <code className="block mt-1 p-2 bg-card/50 rounded text-xs">
-                          Target = 65536 × 10 ÷ {multiplier} = {Math.floor(65536 * 10 / parseFloat(multiplier))}
+                          Target = 65536 × 10 ÷ {multiplier} ={" "}
+                          {Math.floor((65536 * 10) / parseFloat(multiplier))}
                         </code>
                       )}
                     </p>
@@ -298,7 +317,9 @@ export default function GameVerify() {
                   <div>
                     <h4 className="font-semibold mb-1">Determine Winner</h4>
                     <p className="text-sm text-muted-foreground">
-                      You win if the rolled number is less than the target number. The lower the target, the higher the risk and reward!
+                      You win if the rolled number is less than the target
+                      number. The lower the target, the higher the risk and
+                      reward!
                     </p>
                   </div>
                 </div>
@@ -307,7 +328,9 @@ export default function GameVerify() {
               <Alert className="bg-primary/5 border-primary/20">
                 <AlertCircle className="h-4 w-4" />
                 <AlertDescription className="text-sm">
-                  This entire process is deterministic and verifiable. Given the same inputs, you'll always get the same result, proving the game is fair.
+                  This entire process is deterministic and verifiable. Given the
+                  same inputs, you'll always get the same result, proving the
+                  game is fair.
                 </AlertDescription>
               </Alert>
             </CardContent>
@@ -344,19 +367,26 @@ export default function GameVerify() {
               {verificationResult.error ? (
                 <Alert variant="destructive">
                   <AlertCircle className="h-4 w-4" />
-                  <AlertDescription>{verificationResult.error}</AlertDescription>
+                  <AlertDescription>
+                    {verificationResult.error}
+                  </AlertDescription>
                 </Alert>
               ) : (
                 <div className="space-y-6">
                   {/* Result Summary */}
                   <div className="text-center">
-                    <div className={`text-3xl font-bold mb-2 ${
-                      verificationResult.isWin ? 'text-green-500' : 'text-red-500'
-                    }`}>
-                      {verificationResult.isWin ? '🎉 YOU WON!' : '😔 YOU LOST'}
+                    <div
+                      className={`text-3xl font-bold mb-2 ${
+                        verificationResult.isWin
+                          ? "text-green-500"
+                          : "text-red-500"
+                      }`}
+                    >
+                      {verificationResult.isWin ? "🎉 YOU WON!" : "😔 YOU LOST"}
                     </div>
                     <p className="text-muted-foreground">
-                      Rolled {verificationResult.rolledNumber}, needed {verificationResult.targetNumber} or lower
+                      Rolled {verificationResult.rolledNumber}, needed{" "}
+                      {verificationResult.targetNumber} or lower
                     </p>
                   </div>
 
@@ -370,7 +400,7 @@ export default function GameVerify() {
                         Rolled Number
                       </div>
                     </div>
-                    
+
                     <div className="text-center p-4 bg-card/50 rounded-lg">
                       <div className="text-2xl font-bold text-primary">
                         {verificationResult.targetNumber}
@@ -379,7 +409,7 @@ export default function GameVerify() {
                         Target (Max)
                       </div>
                     </div>
-                    
+
                     <div className="text-center p-4 bg-card/50 rounded-lg">
                       <div className="text-2xl font-bold text-primary">
                         {verificationResult.multiplier}x
@@ -388,7 +418,7 @@ export default function GameVerify() {
                         Multiplier
                       </div>
                     </div>
-                    
+
                     <div className="text-center p-4 bg-card/50 rounded-lg">
                       <div className="text-2xl font-bold text-green-500">
                         {verificationResult.winChance.toFixed(1)}%
@@ -404,21 +434,29 @@ export default function GameVerify() {
                     <h3 className="font-semibold">Technical Details</h3>
                     <div className="space-y-2 font-mono text-sm">
                       <div>
-                        <span className="text-muted-foreground">Hash Input:</span>
+                        <span className="text-muted-foreground">
+                          Hash Input:
+                        </span>
                         <div className="bg-card/50 p-2 rounded border break-all">
-                          {nonce}{txHash}
+                          {nonce}
+                          {txHash}
                         </div>
                       </div>
                       <div>
-                        <span className="text-muted-foreground">SHA256 Hash:</span>
+                        <span className="text-muted-foreground">
+                          SHA256 Hash:
+                        </span>
                         <div className="bg-card/50 p-2 rounded border break-all">
                           {verificationResult.hashHex}
                         </div>
                       </div>
                       <div>
-                        <span className="text-muted-foreground">First 2 bytes:</span>
+                        <span className="text-muted-foreground">
+                          First 2 bytes:
+                        </span>
                         <div className="bg-card/50 p-2 rounded border">
-                          {verificationResult.hashHex.substring(0, 4)} → {verificationResult.rolledNumber}
+                          {verificationResult.hashHex.substring(0, 4)} →{" "}
+                          {verificationResult.rolledNumber}
                         </div>
                       </div>
                     </div>
@@ -436,17 +474,30 @@ export default function GameVerify() {
           </CardHeader>
           <CardContent className="space-y-4 text-sm text-muted-foreground">
             <div className="space-y-2">
-              <p><strong>1. Hash Generation:</strong> We combine the nonce + transaction hash and create a SHA256 hash</p>
-              <p><strong>2. Random Number:</strong> We take the first 2 bytes of the hash as a big-endian 16-bit number (0-65535)</p>
-              <p><strong>3. Win Condition:</strong> You win if the rolled number is less than or equal to the target number</p>
-              <p><strong>4. Target Calculation:</strong> Target = (65536 × 1000) ÷ (multiplier × 100)</p>
+              <p>
+                <strong>1. Hash Generation:</strong> We combine the nonce +
+                transaction hash and create a SHA256 hash
+              </p>
+              <p>
+                <strong>2. Random Number:</strong> We take the first 2 bytes of
+                the hash as a big-endian 16-bit number (0-65535)
+              </p>
+              <p>
+                <strong>3. Win Condition:</strong> You win if the rolled number
+                is less than or equal to the target number
+              </p>
+              <p>
+                <strong>4. Target Calculation:</strong> Target = (65536 × 1000)
+                ÷ (multiplier × 100)
+              </p>
             </div>
-            
+
             <Alert>
               <AlertCircle className="h-4 w-4" />
               <AlertDescription>
-                This verification process is identical to what happens on our server. 
-                The game outcome is determined by cryptographic hashing, making it impossible to manipulate.
+                This verification process is identical to what happens on our
+                server. The game outcome is determined by cryptographic hashing,
+                making it impossible to manipulate.
               </AlertDescription>
             </Alert>
           </CardContent>
