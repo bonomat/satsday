@@ -5,6 +5,7 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { BrowserRouter, Route, Routes } from "react-router-dom";
 import Index from "./pages/Index";
 import SatoshisNumber from "./pages/SatoshisNumber";
+import GameVerify from "./pages/GameVerify";
 import NotFound from "./pages/NotFound";
 
 // Initialize WebSocket connection early
@@ -25,6 +26,7 @@ const App = () => (
         <Routes>
           <Route path="/" element={<Index />} />
           <Route path="/game" element={<SatoshisNumber />} />
+          <Route path="/verify" element={<GameVerify />} />
           {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
           <Route path="*" element={<NotFound />} />
         </Routes>

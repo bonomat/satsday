@@ -2,8 +2,9 @@ import { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Slider } from "@/components/ui/slider";
-import { Copy, Loader2 } from "lucide-react";
+import { Copy, Loader2, Shield } from "lucide-react";
 import { toast } from "sonner";
+import { Link } from "react-router-dom";
 import Navbar from "@/components/Navbar";
 import { gameService } from "@/services/gameService";
 import { useAsync } from "react-use";
@@ -127,18 +128,30 @@ export default function SatoshisNumber() {
             think of a number between 1 and 65535. Win if the number is lower
             than your selected threshold - higher risk means bigger rewards!
           </p>
-          <Button
-            variant="ghost"
-            size="sm"
-            className="text-sm text-muted-foreground underline"
-            onClick={() => {
-              document
-                .getElementById("how-it-works")
-                ?.scrollIntoView({ behavior: "smooth" });
-            }}
-          >
-            How Provably Fair Works
-          </Button>
+          <div className="flex flex-col sm:flex-row gap-2 justify-center">
+            <Button
+              variant="ghost"
+              size="sm"
+              className="text-sm text-muted-foreground underline"
+              onClick={() => {
+                document
+                  .getElementById("how-it-works")
+                  ?.scrollIntoView({ behavior: "smooth" });
+              }}
+            >
+              How Provably Fair Works
+            </Button>
+            <Link to="/verify">
+              <Button
+                variant="ghost"
+                size="sm"
+                className="text-sm text-muted-foreground underline"
+              >
+                <Shield className="w-4 h-4 mr-1" />
+                Verify Game Result
+              </Button>
+            </Link>
+          </div>
         </div>
 
         {/* Betting Interface */}

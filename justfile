@@ -53,7 +53,7 @@ game-addresses:
 send address amount:
     cargo run -- --config {{ CONFIG_FILE }} send {{ address }} {{ amount }}
 
-deploy-frontend:
+deploy-frontend-signet:
     #!/bin/bash
     set -e  # Exit on any error
     cd frontend/satsday
@@ -65,6 +65,19 @@ deploy-frontend:
     VITE_API_BASE_URL=https://mutinynetapi.satsday.xyz npm run build
 
     npx wrangler pages deploy dist/ --project-name=satsday-xyz-signet --branch main
+
+deploy-frontend-mainnet:
+    #!/bin/bash
+    set -e  # Exit on any error
+    cd frontend/satsday
+
+    echo "🚀 Starting deployment for satsday.xyz..."
+
+    # Build the frontend
+    echo "📦 Building frontend..."
+    VITE_API_BASE_URL=https://api.satsday.xyz npm run build
+
+#    npx wrangler pages deploy dist/ --project-name=satsday-xyz-mainnet --branch main
 
 run-frontend:
     #!/bin/bash
