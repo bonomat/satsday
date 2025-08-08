@@ -6,6 +6,7 @@ import { Copy, Loader2, Shield } from "lucide-react";
 import { toast } from "sonner";
 import { Link } from "react-router-dom";
 import Navbar from "@/components/Navbar";
+import Footer from "@/components/Footer";
 import { gameService } from "@/services/gameService";
 import { useAsync } from "react-use";
 import QRCode from "react-qr-code";
@@ -290,6 +291,8 @@ export default function SatoshisNumber() {
           <HowItWorks />
         </section>
       </div>
+
+      <Footer />
     </div>
   );
 }

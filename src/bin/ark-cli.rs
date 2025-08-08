@@ -1,9 +1,9 @@
 use anyhow::Result;
 use clap::Parser;
-use satoshi_dice::ArkClient;
-use satoshi_dice::Config;
 use satoshi_dice::db;
 use satoshi_dice::logger;
+use satoshi_dice::ArkClient;
+use satoshi_dice::Config;
 use sqlx::migrate::Migrator;
 use sqlx::sqlite::SqlitePoolOptions;
 use tracing_subscriber::filter::LevelFilter;

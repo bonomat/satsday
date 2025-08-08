@@ -1,21 +1,21 @@
-use crate::ArkClient;
 use crate::db;
 use crate::key_derivation::Multiplier;
 use crate::nonce_service::NonceService;
 use crate::server::DonationItem;
 use crate::server::GameHistoryItem;
 use crate::websocket::SharedBroadcaster;
+use crate::ArkClient;
 use anyhow::Result;
-use ark_core::ArkAddress;
 use ark_core::server::VirtualTxOutPoint;
-use bitcoin::Amount;
+use ark_core::ArkAddress;
 use bitcoin::hashes::Hash;
+use bitcoin::Amount;
 use sqlx::Pool;
 use sqlx::Sqlite;
 use std::sync::Arc;
 use time;
-use tokio::time::Duration;
 use tokio::time::sleep;
+use tokio::time::Duration;
 
 #[derive(Debug, Clone)]
 struct GameResult {
@@ -81,7 +81,7 @@ impl TransactionProcessor {
         tracing::info!("Checking for new spendable VTXOs...");
 
         let spendable_vtxos = self.ark_client.spendable_game_vtxos(true).await?;
-        let total_vtxo:usize = spendable_vtxos.values().map(|v| v.len()).sum();
+        let total_vtxo: usize = spendable_vtxos.values().map(|v| v.len()).sum();
         tracing::info!(total_vtxo, "Found spendable vtxos");
 
         let mut batch_result = BatchProcessingResult {

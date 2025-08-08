@@ -6,6 +6,7 @@ import { BrowserRouter, Route, Routes } from "react-router-dom";
 import Index from "./pages/Index";
 import SatoshisNumber from "./pages/SatoshisNumber";
 import GameVerify from "./pages/GameVerify";
+import Terms from "./pages/Terms";
 import NotFound from "./pages/NotFound";
 
 // Initialize WebSocket connection early
@@ -27,6 +28,7 @@ const App = () => (
           <Route path="/" element={<Index />} />
           <Route path="/game" element={<SatoshisNumber />} />
           <Route path="/verify" element={<GameVerify />} />
+          <Route path="/terms" element={<Terms />} />
           {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
           <Route path="*" element={<NotFound />} />
         </Routes>

@@ -1,6 +1,6 @@
 use crate::db;
-use rand::Rng;
 use rand::random;
+use rand::Rng;
 use sha2::Digest;
 use sha2::Sha256;
 use sqlx::Pool;
@@ -9,8 +9,8 @@ use std::sync::Arc;
 use time::Duration as TimeDuration;
 use time::OffsetDateTime;
 use tokio::sync::RwLock;
-use tokio::time::Duration;
 use tokio::time::interval;
+use tokio::time::Duration;
 
 #[derive(Clone)]
 pub struct NonceService {

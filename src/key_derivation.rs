@@ -1,9 +1,9 @@
-use anyhow::Result;
 use anyhow::anyhow;
-use bitcoin::Network;
+use anyhow::Result;
 use bitcoin::bip32::DerivationPath;
 use bitcoin::bip32::Xpriv;
 use bitcoin::secp256k1::Secp256k1;
+use bitcoin::Network;
 use std::str::FromStr;
 
 /// Multiplier options for the dice game

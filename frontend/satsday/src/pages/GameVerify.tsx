@@ -6,6 +6,7 @@ import { Label } from "@/components/ui/label";
 import { AlertCircle, CheckCircle2, Calculator, Share2 } from "lucide-react";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import Navbar from "@/components/Navbar";
+import Footer from "@/components/Footer";
 import { Link, useSearchParams } from "react-router-dom";
 import { toast } from "sonner";
 
@@ -503,6 +504,8 @@ export default function GameVerify() {
           </CardContent>
         </Card>
       </div>
+
+      <Footer />
     </div>
   );
 }
