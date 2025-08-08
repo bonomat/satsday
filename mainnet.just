@@ -1,4 +1,7 @@
 
+run:
+    cargo run -- --config mainnet.config.toml start -p 12345
+
 deploy-frontend:
     #!/bin/bash
     set -e  # Exit on any error

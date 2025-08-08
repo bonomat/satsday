@@ -1,0 +1,4 @@
+ark_server_url = "https://bitcoin-beta.arkade.sh/v1"
+esplora_url = "https://mempool.space/api"
+master_seed_file = "./main_seed_file.seed"
+database = "./db.sqlite"
