@@ -6,7 +6,6 @@ CONFIG_FILE := env_var_or_default('CONFIG_FILE', 'local.config.toml')
 
 mod mainnet
 mod mutiny
-mod signet
 
 fmt:
     just fmt-dprint
