@@ -1,5 +1,5 @@
 ark_server_url = "http://localhost:7070"
 esplora_url = "http://localhost:30000"
-master_seed_file = "./main_seed_file.seed"
+master_seed_file = "./local_seed_file.seed"
 database = "./db.sqlite"
 transaction_check_interval_seconds = 10
