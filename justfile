@@ -77,7 +77,7 @@ deploy-frontend-mainnet:
     echo "📦 Building frontend..."
     VITE_API_BASE_URL=https://api.satsday.xyz npm run build
 
-#    npx wrangler pages deploy dist/ --project-name=satsday-xyz-mainnet --branch main
+    npx wrangler pages deploy dist/ --project-name=satsday-xyz --branch main
 
 run-frontend:
     #!/bin/bash
