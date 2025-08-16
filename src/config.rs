@@ -8,10 +8,16 @@ pub struct Config {
     pub database: String,
     #[serde(default = "default_transaction_check_interval")]
     pub transaction_check_interval_seconds: u64,
+    #[serde(default = "default_max_payout_sats")]
+    pub max_payout_sats: u64,
 }
 
 fn default_transaction_check_interval() -> u64 {
     10
+}
+
+fn default_max_payout_sats() -> u64 {
+    100_000
 }
 
 impl Config {

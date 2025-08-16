@@ -5,6 +5,7 @@ use crate::transaction_processor::spawn_transaction_monitor;
 use crate::websocket::SharedBroadcaster;
 use crate::websocket::WebSocketBroadcaster;
 use crate::ArkClient;
+use crate::Config;
 use anyhow::Result;
 use axum::extract::Query;
 use axum::extract::State;
@@ -36,6 +37,7 @@ pub struct AppState {
     pub pool: Pool<Sqlite>,
     pub broadcaster: SharedBroadcaster,
     pub nonce_service: crate::nonce_service::NonceService,
+    pub config: Config,
 }
 
 #[derive(Serialize)]
@@ -45,6 +47,7 @@ struct GameAddressInfo {
     multiplier_value: u64,
     max_roll: u16,
     win_probability: f64,
+    max_bet_amount: u64,
 }
 
 #[derive(Deserialize)]
@@ -103,7 +106,7 @@ pub async fn start_server(
     ark_client: ArkClient,
     port: u16,
     pool: Pool<Sqlite>,
-    transaction_check_interval_seconds: u64,
+    config: Config,
 ) -> Result<()> {
     let ark_client_arc = Arc::new(ark_client);
 
@@ -121,20 +124,23 @@ pub async fn start_server(
         pool: pool.clone(),
         broadcaster: broadcaster.clone(),
         nonce_service: nonce_service.clone(),
+        config: config.clone(),
     };
 
     // Start transaction monitoring in background
     spawn_transaction_monitor(
         ark_client_arc,
         my_addresses,
-        transaction_check_interval_seconds,
+        config.transaction_check_interval_seconds,
         nonce_service,
         pool,
         broadcaster,
+        config.max_payout_sats,
     )
     .await;
     tracing::info!(
-        "🔍 Transaction monitoring started (checking every {transaction_check_interval_seconds} seconds)",
+        "🔍 Transaction monitoring started (checking every {} seconds)",
+        config.transaction_check_interval_seconds
     );
 
     let cors = CorsLayer::new()
@@ -209,6 +215,8 @@ async fn get_game_addresses(State(state): State<AppState>) -> Result<Json<Value>
         .into_iter()
         .map(|(multiplier, address)| {
             let win_probability = multiplier.get_lower_than() as f64 / 65536.0 * 100.0;
+            // Calculate max bet amount: max_payout * 100 / multiplier
+            let max_bet_amount = (state.config.max_payout_sats * 100) / multiplier.multiplier();
 
             GameAddressInfo {
                 address: address.encode(),
@@ -216,6 +224,7 @@ async fn get_game_addresses(State(state): State<AppState>) -> Result<Json<Value>
                 multiplier_value: multiplier.multiplier(),
                 max_roll: multiplier.get_lower_than(),
                 win_probability,
+                max_bet_amount,
             }
         })
         .collect();

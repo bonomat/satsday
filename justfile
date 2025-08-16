@@ -57,4 +57,4 @@ run-frontend:
     #!/bin/bash
     set -e  # Exit on any error
     cd frontend/satsday
-    TRANSACTION_CHECK_INTERVAL_SECONDS=3 MAX_PAYOUT_SATS=100000 VITE_API_BASE_URL=http://localhost:12345 pnpm run dev
+    TRANSACTION_CHECK_INTERVAL_SECONDS=3 VITE_MAX_PAYOUT_SATS=100000 VITE_API_BASE_URL=http://localhost:12345 pnpm run dev

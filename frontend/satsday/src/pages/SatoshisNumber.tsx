@@ -63,19 +63,7 @@ export default function SatoshisNumber() {
     }
   };
 
-  // Calculate max amount that can be sent before it becomes a donation
-  const calculateMaxSendAmount = (multiplierValue: number) => {
-    const maxPayoutSats = parseInt(
-      import.meta.env.VITE_MAX_PAYOUT_SATS || "100000",
-    );
-    // Max payout = input_amount * multiplier / 100
-    // So: max_input_amount = max_payout * 100 / multiplier
-    return Math.floor((maxPayoutSats * 100) / multiplierValue);
-  };
-
-  const maxSendAmount = selectedAddress
-    ? calculateMaxSendAmount(selectedAddress.multiplier_value)
-    : 0;
+  const maxSendAmount = selectedAddress ? selectedAddress.max_bet_amount : 0;
 
   if (isLoading) {
     return (

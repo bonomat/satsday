@@ -50,8 +50,7 @@ async fn main() -> Result<()> {
     let pool = SqlitePoolOptions::new().connect(db_url.as_str()).await?;
     MIGRATOR.run(&pool).await?;
 
-    let transaction_check_interval = config.transaction_check_interval_seconds;
-    let client = ArkClient::new(config).await?;
+    let client = ArkClient::new(config.clone()).await?;
 
     match cli.command {
         Commands::Start { port } => {
@@ -59,6 +58,7 @@ async fn main() -> Result<()> {
             tracing::info!("🎲 Starting Satoshi Dice server...");
             tracing::info!("📍 Offchain address: {}", client.get_address());
             tracing::info!("🚢 Boarding address: {}", client.get_boarding_address());
+            tracing::info!("🚢 Max bet amount: {}", config.max_payout_sats);
             for (multiplier, address) in game_addresses {
                 tracing::info!("👾Game Address {}: {}", multiplier, address.encode());
             }
@@ -66,8 +66,7 @@ async fn main() -> Result<()> {
             let balance = client.get_balance().await?;
             tracing::info!("💰 Balance: {:?}", balance);
 
-            satoshi_dice::server::start_server(client, port, pool, transaction_check_interval)
-                .await?;
+            satoshi_dice::server::start_server(client, port, pool, config).await?;
         }
         Commands::Balance => {
             let balance = client.get_balance().await?;

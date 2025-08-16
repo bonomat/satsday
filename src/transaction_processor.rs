@@ -44,6 +44,7 @@ pub struct TransactionProcessor {
     nonce_service: NonceService,
     db_pool: Pool<Sqlite>,
     broadcaster: SharedBroadcaster,
+    max_payout_sats: u64,
 }
 
 impl TransactionProcessor {
@@ -54,6 +55,7 @@ impl TransactionProcessor {
         nonce_service: NonceService,
         db_pool: Pool<Sqlite>,
         broadcaster: SharedBroadcaster,
+        max_payout_sats: u64,
     ) -> Self {
         Self {
             ark_client,
@@ -62,6 +64,7 @@ impl TransactionProcessor {
             nonce_service,
             db_pool,
             broadcaster,
+            max_payout_sats,
         }
     }
 
@@ -160,13 +163,8 @@ impl TransactionProcessor {
     }
 
     fn get_donation_threshold(&self, multiplier: &Multiplier) -> u64 {
-        let max_allowed_payout = std::env::var("MAX_PAYOUT_SATS")
-            .unwrap_or_else(|_| "100000".to_string())
-            .parse::<u64>()
-            .unwrap_or(100_000u64);
-
         // Calculate max input amount: max_payout * 100 / multiplier
-        (max_allowed_payout * 100) / multiplier.multiplier()
+        (self.max_payout_sats * 100) / multiplier.multiplier()
     }
 
     async fn evaluate_game(
@@ -603,6 +601,7 @@ pub async fn spawn_transaction_monitor(
     nonce_service: NonceService,
     db_pool: Pool<Sqlite>,
     broadcaster: SharedBroadcaster,
+    max_payout_sats: u64,
 ) {
     let processor = TransactionProcessor::new(
         ark_client,
@@ -611,6 +610,7 @@ pub async fn spawn_transaction_monitor(
         nonce_service,
         db_pool,
         broadcaster,
+        max_payout_sats,
     );
 
     tokio::spawn(async move {
@@ -622,7 +622,7 @@ pub async fn spawn_transaction_monitor(
 /// Returns (rolled_number, is_win)
 pub fn evaluate_game_outcome(nonce: u64, txid: &str, multiplier: &Multiplier) -> (i64, bool) {
     // Hash nonce + txid
-    let hash_input = format!("{}{}", nonce, txid);
+    let hash_input = format!("{nonce}{txid}");
     let hash = bitcoin::hashes::sha256::Hash::hash(hash_input.as_bytes());
     let hash_bytes = hash.as_byte_array();
 
@@ -648,7 +648,7 @@ mod tests {
             .into_par_iter()
             .map(|i| {
                 let nonce = i as u64;
-                let txid = format!("test_txid_{}", i);
+                let txid = format!("test_txid_{i}");
                 let (_, is_win) = evaluate_game_outcome(nonce, &txid, &multiplier);
                 is_win
             })

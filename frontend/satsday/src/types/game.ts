@@ -4,6 +4,7 @@ export interface GameAddress {
   multiplier: string;
   multiplier_value: number;
   win_probability: number;
+  max_bet_amount: number;
 }
 
 export interface GameInfo {

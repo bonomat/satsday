@@ -3,3 +3,4 @@ esplora_url = "https://mutinynet.com/api"
 master_seed_file = "./mutinynet_seed_file.seed"
 database = "./db.sqlite"
 transaction_check_interval_seconds = 10
+max_payout_sats = 10000
