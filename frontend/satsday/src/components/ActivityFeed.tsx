@@ -11,8 +11,7 @@ import {
   Heart,
 } from "lucide-react";
 import { useState, useMemo } from "react";
-import { useGameWebSocket } from "@/hooks/useGameWebSocket";
-import { DonationItem } from "@/services/websocket";
+import { useGameWebSocket, DonationItem } from "@/hooks/useGameWebSocket";
 import { Button } from "./ui/button";
 import {
   Tooltip,

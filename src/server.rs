@@ -394,14 +394,18 @@ async fn handle_websocket(socket: axum::extract::ws::WebSocket, state: AppState)
     };
 
     // Spawn task to handle incoming messages (ping/pong)
-    let receiver_task = tokio::spawn(async move {
+    let mut receiver_handle = tokio::spawn(async move {
         while let Some(Ok(msg)) = receiver.next().await {
             match msg {
-                Message::Ping(_) => {
-                    tracing::debug!("Received ping, sending pong");
+                Message::Ping(_data) => {
+                    tracing::trace!(target: "websocket", "Received ping, sending pong");
+                    // Note: pong is handled automatically by axum's WebSocket implementation
+                }
+                Message::Pong(_) => {
+                    tracing::trace!(target: "websocket", "Received pong");
                 }
                 Message::Close(_) => {
-                    tracing::debug!("WebSocket connection closed by client");
+                    tracing::trace!(target: "websocket", "WebSocket connection closed by client");
                     break;
                 }
                 _ => {}
@@ -409,24 +413,47 @@ async fn handle_websocket(socket: axum::extract::ws::WebSocket, state: AppState)
         }
     });
 
-    // Spawn task to send real-time updates
-    let sender_task = tokio::spawn(async move {
-        while let Ok(msg) = rx.recv().await {
-            if sender.send(Message::Text(msg.into())).await.is_err() {
-                break;
+    // Create interval for sending periodic pings to keep connection alive
+    let mut ping_interval = tokio::time::interval(tokio::time::Duration::from_secs(30));
+
+    // Spawn task to send real-time updates and periodic pings
+    let mut sender_handle = tokio::spawn(async move {
+        loop {
+            tokio::select! {
+                // Handle broadcast messages
+                Ok(msg) = rx.recv() => {
+                    if sender.send(Message::Text(msg.into())).await.is_err() {
+                        tracing::debug!("Failed to send message, client disconnected");
+                        break;
+                    }
+                }
+                // Send periodic ping to keep connection alive
+                _ = ping_interval.tick() => {
+                    if sender.send(Message::Ping(vec![].into())).await.is_err() {
+                        tracing::debug!("Failed to send ping, client disconnected");
+                        break;
+                    }
+                    tracing::trace!("Sent ping to keep WebSocket alive");
+                }
             }
         }
     });
 
-    // Wait for either task to complete (connection closed or error)
+    // Wait for either task to complete and cleanup both
     tokio::select! {
-        _ = receiver_task => {
-            tracing::debug!("WebSocket receiver task completed");
+        _ = &mut receiver_handle => {
+            tracing::debug!("WebSocket receiver task completed, aborting sender");
+            sender_handle.abort();
         }
-        _ = sender_task => {
-            tracing::debug!("WebSocket sender task completed");
+        _ = &mut sender_handle => {
+            tracing::debug!("WebSocket sender task completed, aborting receiver");
+            receiver_handle.abort();
         }
     }
 
-    tracing::debug!("WebSocket connection closed");
+    // Ensure both tasks are cleaned up
+    let _ = receiver_handle.await;
+    let _ = sender_handle.await;
+
+    tracing::info!("WebSocket connection fully closed and cleaned up");
 }
