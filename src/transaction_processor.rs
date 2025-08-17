@@ -632,6 +632,7 @@ pub fn evaluate_game_outcome(nonce: u64, txid: &str, multiplier: &Multiplier) ->
     (evaluation.rolled_value, evaluation.is_win)
 }
 
+#[allow(clippy::print_stdout)]
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -677,15 +678,15 @@ mod tests {
         println!("\n=== {} ({}x) ===", multiplier_name, multiplier_value);
         println!("Iterations: {}", stats["total"]);
         println!("Wins: {} | Losses: {}", stats["wins"], stats["losses"]);
-        println!("Expected win rate: {:.2}%", expected_win_rate);
-        println!("Actual win rate: {:.2}%", actual_win_rate);
+        println!("Expected win rate: {expected_win_rate:.2}%",);
+        println!("Actual win rate: {actual_win_rate:.2}%",);
         println!(
             "Deviation: {:.2}%",
             (actual_win_rate - expected_win_rate).abs()
         );
 
         let house_edge = 100.0 - (expected_win_rate * multiplier_value);
-        println!("House edge: {:.2}%", house_edge);
+        println!("House edge: {house_edge:.2}%",);
 
         // Calculate profit/loss for 1000 sats per bet
         let bet_amount = 1000i64;
@@ -696,11 +697,11 @@ mod tests {
         let house_profit = -player_profit;
 
         println!("📊 If player bet 1000 sats per game:");
-        println!("   Total wagered: {} sats", total_wagered);
+        println!("   Total wagered: {total_wagered} sats",);
         println!(
             "   Player would have: {} sats ({})",
             if player_profit >= 0 {
-                format!("+{}", player_profit)
+                format!("+{player_profit}",)
             } else {
                 player_profit.to_string()
             },
@@ -709,7 +710,7 @@ mod tests {
         println!(
             "   House would have: {} sats ({})",
             if house_profit >= 0 {
-                format!("+{}", house_profit)
+                format!("+{house_profit}",)
             } else {
                 house_profit.to_string()
             },

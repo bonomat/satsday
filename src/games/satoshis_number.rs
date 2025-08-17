@@ -40,6 +40,7 @@ impl Game for SatoshisNumberGame {
     }
 }
 
+#[allow(clippy::print_stdout)]
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -83,8 +84,8 @@ mod tests {
 
         println!("X200 Test Results:");
         println!("Wins: {} | Losses: {}", stats["wins"], stats["losses"]);
-        println!("Expected win rate: {:.2}%", expected);
-        println!("Actual win rate: {:.2}%", actual);
+        println!("Expected win rate: {expected:.2}%",);
+        println!("Actual win rate: {actual:.2}%",);
 
         assert!(
             (actual - expected).abs() < 3.0,
