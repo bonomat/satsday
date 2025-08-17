@@ -1,5 +1,6 @@
 use crate::config::Config;
 use crate::esplora::EsploraClient;
+use crate::games::GameType;
 use crate::key_derivation::KeyDerivation;
 use crate::key_derivation::Multiplier;
 use anyhow::bail;
@@ -131,6 +132,7 @@ impl ArkClient {
             )?;
 
             game_addresses.push(GameArkAddress {
+                game_type: GameType::SatoshisNumber, // For now, all addresses are SatoshisNumber
                 multiplier,
                 vtxo: game_vtxo,
                 secret_key: game_sk,
@@ -413,6 +415,24 @@ impl ArkClient {
     }
 
     pub async fn spendable_game_vtxos(
+        &self,
+        select_recoverable_vtxos: bool,
+    ) -> Result<HashMap<(GameType, Multiplier), Vec<ark_core::server::VirtualTxOutPoint>>> {
+        let mut spendable_vtxos = HashMap::new();
+
+        for game_address in &self.game_addresses {
+            let (_, outpoints) = self
+                ._spendable_vtxos(game_address.vtxo.clone(), select_recoverable_vtxos)
+                .await?;
+            let key = (game_address.game_type, game_address.multiplier);
+            spendable_vtxos.insert(key, outpoints);
+        }
+
+        Ok(spendable_vtxos)
+    }
+
+    /// Legacy method for backward compatibility
+    pub async fn spendable_game_vtxos_legacy(
         &self,
         select_recoverable_vtxos: bool,
     ) -> Result<HashMap<Multiplier, Vec<ark_core::server::VirtualTxOutPoint>>> {
@@ -834,7 +854,15 @@ impl ArkClient {
         Ok(parent_addresses)
     }
 
-    pub fn get_game_addresses(&self) -> Vec<(Multiplier, ArkAddress)> {
+    pub fn get_game_addresses(&self) -> Vec<(GameType, Multiplier, ArkAddress)> {
+        let vec = self.game_addresses.clone();
+        vec.iter()
+            .map(|a| (a.game_type, a.multiplier, a.vtxo.to_ark_address()))
+            .collect()
+    }
+
+    /// Legacy method for backward compatibility
+    pub fn get_game_addresses_legacy(&self) -> Vec<(Multiplier, ArkAddress)> {
         let vec = self.game_addresses.clone();
         vec.iter()
             .map(|a| (a.multiplier, a.vtxo.to_ark_address()))
@@ -844,13 +872,22 @@ impl ArkClient {
     pub fn dust_value(&self) -> Amount {
         self.server_info.dust
     }
+
+    /// Find the game type and multiplier for a given address
+    pub fn find_game_info(&self, address: &ArkAddress) -> Option<(GameType, Multiplier)> {
+        self.game_addresses
+            .iter()
+            .find(|game_addr| game_addr.vtxo.to_ark_address().encode() == address.encode())
+            .map(|game_addr| (game_addr.game_type, game_addr.multiplier))
+    }
 }
 
 #[derive(Debug, Clone)]
-struct GameArkAddress {
-    multiplier: Multiplier,
-    vtxo: Vtxo,
-    secret_key: SecretKey,
+pub struct GameArkAddress {
+    pub game_type: GameType,
+    pub multiplier: Multiplier,
+    pub vtxo: Vtxo,
+    pub secret_key: SecretKey,
 }
 
 async fn get_address_from_output(

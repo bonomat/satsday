@@ -1,4 +1,6 @@
 use crate::db;
+use crate::games::get_game;
+use crate::games::GameType;
 use crate::key_derivation::Multiplier;
 use crate::nonce_service::NonceService;
 use crate::server::DonationItem;
@@ -8,7 +10,6 @@ use crate::ArkClient;
 use anyhow::Result;
 use ark_core::server::VirtualTxOutPoint;
 use ark_core::ArkAddress;
-use bitcoin::hashes::Hash;
 use bitcoin::Amount;
 use sqlx::Pool;
 use sqlx::Sqlite;
@@ -94,7 +95,7 @@ impl TransactionProcessor {
         };
 
         // First pass: collect all game results
-        for (multiplier, outpoints) in &spendable_vtxos {
+        for ((game_type, multiplier), outpoints) in &spendable_vtxos {
             for outpoint in outpoints {
                 let tx_id = outpoint.outpoint.txid.to_string();
 
@@ -106,7 +107,9 @@ impl TransactionProcessor {
                     (Ok(false), Ok(false)) => {
                         tracing::trace!(target : "tx_processor", tx_id, "Processing new transaction");
 
-                        if let Some(game_result) = self.evaluate_game(multiplier, outpoint).await? {
+                        if let Some(game_result) =
+                            self.evaluate_game(*game_type, multiplier, outpoint).await?
+                        {
                             match game_result {
                                 result
                                     if result.payout_amount.is_none()
@@ -169,6 +172,7 @@ impl TransactionProcessor {
 
     async fn evaluate_game(
         &self,
+        game_type: GameType,
         multiplier: &Multiplier,
         outpoint: &VirtualTxOutPoint,
     ) -> Result<Option<GameResult>> {
@@ -212,15 +216,16 @@ impl TransactionProcessor {
                 }));
             }
 
-            // Game logic
-            let (rolled_number, player_wins) = evaluate_game_outcome(
+            // Game logic - using the abstracted game system
+            let game = get_game(game_type);
+            let evaluation = game.evaluate(
                 current_nonce,
                 &outpoint.outpoint.txid.to_string(),
                 multiplier,
             );
 
-            let payout_amount = if player_wins {
-                Some((input_amount * multiplier.multiplier()) / 100)
+            let payout_amount = if evaluation.is_win {
+                Some((input_amount as f64 * evaluation.payout_multiplier.unwrap()) as u64)
             } else {
                 None
             };
@@ -232,8 +237,8 @@ impl TransactionProcessor {
                 sender,
                 input_amount,
                 current_nonce,
-                rolled_number,
-                is_win: player_wins,
+                rolled_number: evaluation.rolled_value,
+                is_win: evaluation.is_win,
                 payout_amount,
             }));
         }
@@ -618,20 +623,13 @@ pub async fn spawn_transaction_monitor(
     });
 }
 
-/// Evaluate game outcome based on nonce, transaction ID, and multiplier
-/// Returns (rolled_number, is_win)
+/// Legacy function for backward compatibility
+/// Game evaluation logic has been moved to the games module
+#[deprecated(note = "Use games::get_game(GameType::SatoshisNumber).evaluate() instead")]
 pub fn evaluate_game_outcome(nonce: u64, txid: &str, multiplier: &Multiplier) -> (i64, bool) {
-    // Hash nonce + txid
-    let hash_input = format!("{nonce}{txid}");
-    let hash = bitcoin::hashes::sha256::Hash::hash(hash_input.as_bytes());
-    let hash_bytes = hash.as_byte_array();
-
-    // Use first 2 bytes as u16 for randomness (0-65535 range)
-    let random_value = u16::from_be_bytes([hash_bytes[0], hash_bytes[1]]);
-    let rolled_number = random_value as i64;
-    let player_wins = multiplier.is_win(random_value);
-
-    (rolled_number, player_wins)
+    let game = get_game(GameType::SatoshisNumber);
+    let evaluation = game.evaluate(nonce, txid, multiplier);
+    (evaluation.rolled_value, evaluation.is_win)
 }
 
 #[cfg(test)]
@@ -647,10 +645,11 @@ mod tests {
         let results: Vec<bool> = (0..TEST_ITERATIONS)
             .into_par_iter()
             .map(|i| {
+                let game = get_game(GameType::SatoshisNumber);
                 let nonce = i as u64;
                 let txid = format!("test_txid_{i}");
-                let (_, is_win) = evaluate_game_outcome(nonce, &txid, &multiplier);
-                is_win
+                let evaluation = game.evaluate(nonce, &txid, &multiplier);
+                evaluation.is_win
             })
             .collect();
 

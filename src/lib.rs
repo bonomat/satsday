@@ -2,6 +2,7 @@ pub mod client;
 pub mod config;
 pub mod db;
 pub mod esplora;
+pub mod games;
 pub mod key_derivation;
 pub mod logger;
 pub mod nonce_service;

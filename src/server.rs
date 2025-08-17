@@ -42,6 +42,7 @@ pub struct AppState {
 
 #[derive(Serialize)]
 struct GameAddressInfo {
+    game_type: u8,
     address: String,
     multiplier: String,
     multiplier_value: u64,
@@ -213,12 +214,13 @@ async fn get_game_addresses(State(state): State<AppState>) -> Result<Json<Value>
 
     let addresses: Vec<GameAddressInfo> = game_addresses
         .into_iter()
-        .map(|(multiplier, address)| {
+        .map(|(game_type, multiplier, address)| {
             let win_probability = multiplier.get_lower_than() as f64 / 65536.0 * 100.0;
             // Calculate max bet amount: max_payout * 100 / multiplier
             let max_bet_amount = (state.config.max_payout_sats * 100) / multiplier.multiplier();
 
             GameAddressInfo {
+                game_type: game_type as u8,
                 address: address.encode(),
                 multiplier: multiplier.to_string(),
                 multiplier_value: multiplier.multiplier(),

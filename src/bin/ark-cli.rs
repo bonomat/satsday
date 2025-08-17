@@ -59,8 +59,13 @@ async fn main() -> Result<()> {
             tracing::info!("📍 Offchain address: {}", client.get_address());
             tracing::info!("🚢 Boarding address: {}", client.get_boarding_address());
             tracing::info!("🚢 Max bet amount: {}", config.max_payout_sats);
-            for (multiplier, address) in game_addresses {
-                tracing::info!("👾Game Address {}: {}", multiplier, address.encode());
+            for (game_type, multiplier, address) in game_addresses {
+                tracing::info!(
+                    "👾Game Address {} {}: {}",
+                    game_type.to_string(),
+                    multiplier,
+                    address.encode()
+                );
             }
 
             let balance = client.get_balance().await?;
@@ -87,8 +92,13 @@ async fn main() -> Result<()> {
         }
         Commands::GameAddresses => {
             let game_addresses = client.get_game_addresses();
-            for (multiplier, address) in game_addresses {
-                tracing::info!("👾Game Address {}: {}", multiplier, address.encode());
+            for (game_type, multiplier, address) in game_addresses {
+                tracing::info!(
+                    "👾Game Address {} {}: {}",
+                    game_type as u8,
+                    multiplier,
+                    address.encode()
+                );
             }
         }
         Commands::BoardingAddress => {
