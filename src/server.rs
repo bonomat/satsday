@@ -103,6 +103,22 @@ struct GameHistoryResponse {
     total_pages: i64,
 }
 
+#[derive(Serialize)]
+struct GameStatsItem {
+    game_type: String,
+    multiplier: String,
+    address: String,
+    number_of_games: usize,
+    #[serde(with = "bitcoin::amount::serde::as_sat")]
+    total_received: Amount,
+}
+
+#[derive(Serialize)]
+struct StatsResponse {
+    total_games: usize,
+    game_stats: Vec<GameStatsItem>,
+}
+
 pub async fn start_server(
     ark_client: ArkClient,
     port: u16,
@@ -166,6 +182,7 @@ pub async fn start_server(
         .route("/boarding-address", get(get_boarding_address))
         .route("/game-addresses", get(get_game_addresses))
         .route("/games", get(get_games))
+        .route("/stats", get(get_stats))
         .route("/version", get(get_version))
         .route("/balance", get(get_balance))
         .route("/ws", get(websocket_handler))
@@ -180,6 +197,7 @@ pub async fn start_server(
     tracing::info!("🚢 Boarding address endpoint: http://{addr}/boarding-address");
     tracing::info!("🎮 Game addresses endpoint: http://{addr}/game-addresses");
     tracing::info!("📊 Games history endpoint: http://{addr}/games");
+    tracing::info!("📈 Stats endpoint: http://{addr}/stats");
     tracing::info!("ℹ️ Version endpoint: http://{addr}/version");
     tracing::info!("💰 Balance endpoint: http://{addr}/balance");
     tracing::info!("🔌 WebSocket endpoint: ws://{addr}/ws");
@@ -291,6 +309,48 @@ async fn get_games(
         page,
         page_size,
         total_pages,
+    }))
+}
+
+async fn get_stats(State(state): State<AppState>) -> Result<Json<StatsResponse>, StatusCode> {
+    let game_addresses = state.ark_client.get_game_addresses();
+    let addresses_only: Vec<_> = game_addresses
+        .iter()
+        .map(|(_, _, address)| *address)
+        .collect();
+
+    let vtxos = state
+        .ark_client
+        .list_vtxos(addresses_only.as_slice())
+        .await
+        .map_err(|e| {
+            tracing::error!("Failed to get VTXOs for stats: {}", e);
+            StatusCode::INTERNAL_SERVER_ERROR
+        })?;
+
+    let total_games = vtxos.len();
+    let mut game_stats = Vec::new();
+
+    for (game_type, multiplier, ark_address) in game_addresses {
+        let per_address: Vec<_> = vtxos
+            .iter()
+            .filter(|vtxo| vtxo.script == ark_address.to_p2tr_script_pubkey())
+            .collect();
+        
+        let total_received: Amount = per_address.iter().map(|v| v.amount).sum();
+
+        game_stats.push(GameStatsItem {
+            game_type: game_type.to_string(),
+            multiplier: multiplier.to_string(),
+            address: ark_address.encode(),
+            number_of_games: per_address.len(),
+            total_received,
+        });
+    }
+
+    Ok(Json(StatsResponse {
+        total_games,
+        game_stats,
     }))
 }
 
