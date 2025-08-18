@@ -199,31 +199,25 @@ impl ArkClient {
         })
     }
 
-    pub async fn send(&self, address_amounts: Vec<(&ArkAddress, Amount)>) -> Result<Txid> {
+    pub async fn send_offchain(&self, address_amounts: Vec<(&ArkAddress, Amount)>) -> Result<Txid> {
         for (address, amount) in &address_amounts {
             tracing::debug!(target: "client", address = address.encode(), amount = amount.to_string(), "Sending money to");
         }
 
-        let runtime = tokio::runtime::Handle::current();
-        let find_outpoints_fn =
-            |address: &bitcoin::Address| -> Result<Vec<ark_core::ExplorerUtxo>, ark_core::Error> {
-                block_in_place(|| {
-                    runtime.block_on(async {
-                        let outpoints = self
-                            .esplora_client
-                            .find_outpoints(address)
-                            .await
-                            .map_err(ark_core::Error::ad_hoc)?;
-                        Ok(outpoints)
-                    })
-                })
-            };
-
         let virtual_tx_outpoints = {
-            let spendable_vtxos = self.spendable_vtxos(false).await?;
-            list_virtual_tx_outpoints(find_outpoints_fn, spendable_vtxos)?
+            let spendable_vtxos = self.spendable_offchain_vtxos(false).await?;
+            let mut spendable = vec![];
+            for (vtxo, outpoints) in spendable_vtxos {
+                for outpoint in outpoints {
+                    spendable.push((outpoint, vtxo.clone()));
+                }
+            }
+            VirtualTxOutPoints {
+                spendable,
+                // TODO: we should check for expired as well
+                expired: vec![],
+            }
         };
-
         let vtxo_outpoints = virtual_tx_outpoints
             .spendable
             .iter()
@@ -242,40 +236,11 @@ impl ArkClient {
             select_vtxos(vtxo_outpoints, total_amount, self.server_info.dust, true)?
         };
 
-        self.send_with_outpoints(address_amounts, &selected_outpoints)
-            .await
-    }
-
-    pub async fn send_with_outpoints(
-        &self,
-        address_amounts: Vec<(&ArkAddress, Amount)>,
-        specific_outpoints: &[ark_core::coin_select::VirtualTxOutPoint],
-    ) -> Result<Txid> {
-        let runtime = tokio::runtime::Handle::current();
-        let find_outpoints_fn =
-            |address: &bitcoin::Address| -> Result<Vec<ark_core::ExplorerUtxo>, ark_core::Error> {
-                block_in_place(|| {
-                    runtime.block_on(async {
-                        let outpoints = self
-                            .esplora_client
-                            .find_outpoints(address)
-                            .await
-                            .map_err(ark_core::Error::ad_hoc)?;
-                        Ok(outpoints)
-                    })
-                })
-            };
-
-        let virtual_tx_outpoints = {
-            let spendable_vtxos = self.spendable_vtxos(false).await?;
-            list_virtual_tx_outpoints(find_outpoints_fn, spendable_vtxos)?
-        };
-
         let vtxo_inputs = virtual_tx_outpoints
             .spendable
             .into_iter()
             .filter(|(outpoint, _)| {
-                specific_outpoints
+                selected_outpoints
                     .iter()
                     .any(|o| o.outpoint == outpoint.outpoint)
             })
@@ -303,7 +268,6 @@ impl ArkClient {
         let sign_fn = |msg: secp256k1::Message,
                        vtxo: &Vtxo|
          -> Result<(schnorr::Signature, XOnlyPublicKey), ark_core::Error> {
-            // TODO: find the correct kp here, not sure how yet.
             let kp = all_keys.iter().find_map(|(v, sk)| {
                 if v.to_ark_address().encode() == vtxo.to_ark_address().encode() {
                     Some(sk.keypair(&self.secp))
@@ -422,47 +386,52 @@ impl ArkClient {
         Ok(spendable_vtxos)
     }
 
-    pub async fn spendable_game_vtxos(
+    pub async fn spendable_offchain_vtxos(
         &self,
         select_recoverable_vtxos: bool,
-    ) -> Result<HashMap<(GameType, Multiplier), Vec<ark_core::server::VirtualTxOutPoint>>> {
+    ) -> Result<HashMap<Vtxo, Vec<ark_core::server::VirtualTxOutPoint>>> {
+        let main = self
+            ._spendable_vtxos(self.main_address.0.clone(), select_recoverable_vtxos)
+            .await?;
+
+        let game_addressess = self
+            .game_addresses
+            .iter()
+            .map(|a| a.vtxo.to_ark_address())
+            .collect::<Vec<_>>();
+
+        let request = GetVtxosRequest::new_for_addresses(game_addressess.as_slice());
+
+        let vtxo_outpoints = self.grpc_client.list_vtxos(request).await?;
+
+        let spendable = if select_recoverable_vtxos {
+            vtxo_outpoints.spendable_with_recoverable()
+        } else {
+            vtxo_outpoints.spendable().to_vec()
+        };
+
         let mut spendable_vtxos = HashMap::new();
+        spendable_vtxos.insert(main.0, main.1);
 
         for game_address in &self.game_addresses {
-            let (_, outpoints) = self
-                ._spendable_vtxos(game_address.vtxo.clone(), select_recoverable_vtxos)
-                .await?;
-            let key = (game_address.game_type, game_address.multiplier);
-            spendable_vtxos.insert(key, outpoints);
+            let outpoints = spendable
+                .clone()
+                .into_iter()
+                .filter(|vtop| vtop.script == game_address.vtxo.script_pubkey())
+                .collect::<Vec<_>>();
+            spendable_vtxos.insert(game_address.vtxo.clone(), outpoints);
         }
 
         Ok(spendable_vtxos)
     }
 
-    /// Legacy method for backward compatibility
-    pub async fn spendable_game_vtxos_legacy(
-        &self,
-        select_recoverable_vtxos: bool,
-    ) -> Result<HashMap<Multiplier, Vec<ark_core::server::VirtualTxOutPoint>>> {
-        let mut spendable_vtxos = HashMap::new();
-
-        for game_address in &self.game_addresses {
-            let (_, outpoints) = self
-                ._spendable_vtxos(game_address.vtxo.clone(), select_recoverable_vtxos)
-                .await?;
-            let spendable = (game_address.multiplier, outpoints);
-            spendable_vtxos.insert(spendable.0, spendable.1);
-        }
-
-        Ok(spendable_vtxos)
-    }
-
-    pub async fn _spendable_vtxos(
+    async fn _spendable_vtxos(
         &self,
         vtxo: Vtxo,
         select_recoverable_vtxos: bool,
     ) -> Result<(Vtxo, Vec<ark_core::server::VirtualTxOutPoint>)> {
         let request = GetVtxosRequest::new_for_addresses(&[vtxo.to_ark_address()]);
+
         let vtxo_outpoints = self.grpc_client.list_vtxos(request).await?;
 
         let spendable = if select_recoverable_vtxos {

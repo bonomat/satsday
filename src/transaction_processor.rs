@@ -358,7 +358,7 @@ impl TransactionProcessor {
         loop {
             match self
                 .ark_client
-                .send(vec![(&winner.sender_address, payout_amount)])
+                .send_offchain(vec![(&winner.sender_address, payout_amount)])
                 .await
             {
                 Ok(txid) => {

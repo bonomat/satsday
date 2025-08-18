@@ -107,7 +107,7 @@ async fn main() -> Result<()> {
         Commands::Send { address, amount } => {
             let ark_address = ark_core::ArkAddress::decode(&address)?;
             let amount = bitcoin::Amount::from_sat(amount);
-            let txid = client.send(vec![(&ark_address, amount)]).await?;
+            let txid = client.send_offchain(vec![(&ark_address, amount)]).await?;
 
             tracing::info!("Sent {} to {} in transaction {}", amount, address, txid);
             db::insert_own_transaction(&pool, txid.to_string().as_str(), "manual_send").await?;
