@@ -68,6 +68,14 @@ pub struct Balance {
     pub boarding_pending: Amount,
 }
 
+#[derive(Debug, Clone)]
+pub struct SubscriptionEvent {
+    pub txid: Txid,
+    pub vout: u32,
+    pub amount: Amount,
+    pub script_pubkey: bitcoin::ScriptBuf,
+}
+
 impl ArkClient {
     pub async fn new(config: Config) -> Result<Self> {
         let secp = Secp256k1::new();
@@ -879,6 +887,100 @@ impl ArkClient {
             .iter()
             .find(|game_addr| game_addr.vtxo.to_ark_address().encode() == address.encode())
             .map(|game_addr| (game_addr.game_type, game_addr.multiplier))
+    }
+
+    /// Subscribe to script pubkeys for real-time notifications
+    pub async fn subscribe_to_scripts(&self, scripts: Vec<ArkAddress>) -> Result<String> {
+        let length = scripts.len();
+        let subscription_id = self.grpc_client.subscribe_to_scripts(scripts, None).await?;
+        tracing::info!(
+            subscription_id = subscription_id,
+            scripts = length,
+            "📡 Subscribed scripts"
+        );
+        Ok(subscription_id)
+    }
+
+    /// Unsubscribe from script pubkeys
+    pub async fn unsubscribe_from_scripts(
+        &self,
+        scripts: Vec<ArkAddress>,
+        subscription_id: String,
+    ) -> Result<()> {
+        self.grpc_client
+            .unsubscribe_from_scripts(scripts, subscription_id.clone())
+            .await?;
+        tracing::info!(
+            subscription_id = subscription_id,
+            "📡 Unsubscribed from scripts (placeholder implementation)"
+        );
+        Ok(())
+    }
+
+    /// Get subscription stream
+    pub async fn get_subscription(
+        &self,
+        subscription_id: String,
+    ) -> Result<std::pin::Pin<Box<dyn futures::Stream<Item = Result<SubscriptionEvent>> + Send + '_>>>
+    {
+        use futures::stream::StreamExt;
+
+        let mut subscription_stream = self.grpc_client.get_subscription(subscription_id).await?;
+
+        let game_addresses = self.get_game_addresses();
+
+        let stream = async_stream::stream! {
+            while let Some(result) = subscription_stream.next().await {
+                match result {
+                    Ok(response) => {
+                        // Get the transaction details
+                        let psbt = if let Some(psbt) = response.tx {
+                            psbt
+                        } else {
+                            match self.grpc_client
+                                .get_virtual_txs(vec![response.txid.to_string()], None)
+                                .await {
+                                Ok(fetched) => {
+                                    if let Some(tx) = fetched.txs.into_iter().next() {
+                                        tx
+                                    } else {
+                                        tracing::warn!("No transactions found for txid: {}", response.txid);
+                                        continue;
+                                    }
+                                }
+                                Err(e) => {
+                                    tracing::error!("Failed to fetch transaction: {}", e);
+                                    continue;
+                                }
+                            }
+                        };
+
+                        let tx = &psbt.unsigned_tx;
+                        let txid = tx.compute_txid();
+
+                        // Check each output to see if it matches one of our game addresses
+                        for (vout, output) in tx.output.iter().enumerate() {
+                            for (_, _, address) in &game_addresses {
+                                if output.script_pubkey == address.to_p2tr_script_pubkey() {
+                                    yield Ok(SubscriptionEvent {
+                                        txid,
+                                        vout: vout as u32,
+                                        amount: Amount::from_sat(output.value.to_sat()),
+                                        script_pubkey: output.script_pubkey.clone(),
+                                    });
+                                }
+                            }
+                        }
+                    }
+                    Err(e) => {
+                        tracing::error!("Error receiving subscription response: {}", e);
+                        yield Err(anyhow::anyhow!("Subscription error: {}", e));
+                    }
+                }
+            }
+        };
+
+        Ok(Box::pin(stream))
     }
 }
 

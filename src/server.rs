@@ -132,17 +132,13 @@ pub async fn start_server(
     spawn_transaction_monitor(
         ark_client_arc,
         my_addresses,
-        config.transaction_check_interval_seconds,
         nonce_service,
         pool,
         broadcaster,
         config.max_payout_sats,
     )
     .await;
-    tracing::info!(
-        "🔍 Transaction monitoring started (checking every {} seconds)",
-        config.transaction_check_interval_seconds
-    );
+    tracing::info!("🔍 Transaction monitoring started with subscriptions");
 
     let cors = CorsLayer::new()
         .allow_credentials(true)

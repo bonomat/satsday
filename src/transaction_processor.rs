@@ -1,3 +1,4 @@
+use crate::client::SubscriptionEvent;
 use crate::db;
 use crate::games::get_game;
 use crate::games::GameType;
@@ -8,9 +9,9 @@ use crate::server::GameHistoryItem;
 use crate::websocket::SharedBroadcaster;
 use crate::ArkClient;
 use anyhow::Result;
-use ark_core::server::VirtualTxOutPoint;
 use ark_core::ArkAddress;
 use bitcoin::Amount;
+use bitcoin::OutPoint;
 use sqlx::Pool;
 use sqlx::Sqlite;
 use std::sync::Arc;
@@ -21,7 +22,7 @@ use tokio::time::Duration;
 #[derive(Debug, Clone)]
 struct GameResult {
     multiplier: Multiplier,
-    outpoint: VirtualTxOutPoint,
+    outpoint: OutPoint,
     sender_address: ArkAddress,
     sender: String,
     input_amount: u64,
@@ -31,17 +32,9 @@ struct GameResult {
     payout_amount: Option<u64>,
 }
 
-#[derive(Debug)]
-struct BatchProcessingResult {
-    winners: Vec<GameResult>,
-    losers: Vec<GameResult>,
-    donations: Vec<GameResult>,
-}
-
 pub struct TransactionProcessor {
     ark_client: Arc<ArkClient>,
     my_addresses: Vec<ArkAddress>,
-    check_interval: Duration,
     nonce_service: NonceService,
     db_pool: Pool<Sqlite>,
     broadcaster: SharedBroadcaster,
@@ -52,7 +45,6 @@ impl TransactionProcessor {
     pub fn new(
         ark_client: Arc<ArkClient>,
         my_addresses: Vec<ArkAddress>,
-        check_interval_seconds: u64,
         nonce_service: NonceService,
         db_pool: Pool<Sqlite>,
         broadcaster: SharedBroadcaster,
@@ -61,7 +53,6 @@ impl TransactionProcessor {
         Self {
             ark_client,
             my_addresses,
-            check_interval: Duration::from_secs(check_interval_seconds),
             nonce_service,
             db_pool,
             broadcaster,
@@ -70,85 +61,145 @@ impl TransactionProcessor {
     }
 
     pub async fn start_monitoring(&self) {
-        tracing::info!("🔍 Starting transaction monitoring loop...");
+        tracing::info!("🔍 Starting transaction monitoring with subscriptions...");
 
-        loop {
-            if let Err(e) = self.check_for_new_transactions().await {
-                tracing::error!("Error checking for new transactions: {}", e);
+        // Get all game addresses to subscribe to
+        let game_addresses = self.ark_client.get_game_addresses();
+
+        // Collect addresses for subscription
+        let scripts: Vec<_> = game_addresses
+            .iter()
+            .map(|(_, _, address)| *address)
+            .collect();
+
+        tracing::info!("📡 Subscribing to {} game addresses", scripts.len());
+
+        // Subscribe to all game address scripts
+        let subscription_id = match self.ark_client.subscribe_to_scripts(scripts).await {
+            Ok(id) => id,
+            Err(e) => {
+                tracing::error!("Failed to subscribe to scripts: {}", e);
+                return;
             }
+        };
 
-            sleep(self.check_interval).await;
+        tracing::info!(
+            "✅ Successfully subscribed to game addresses with ID: {}",
+            subscription_id
+        );
+
+        // Get subscription stream and process events
+        match self.ark_client.get_subscription(subscription_id).await {
+            Ok(stream) => {
+                self.process_subscription_stream(stream).await;
+            }
+            Err(e) => {
+                tracing::error!("Failed to get subscription stream: {}", e);
+            }
         }
     }
 
-    async fn check_for_new_transactions(&self) -> Result<()> {
-        tracing::info!("Checking for new spendable VTXOs...");
+    async fn process_subscription_stream(
+        &self,
+        mut stream: std::pin::Pin<
+            Box<dyn futures::Stream<Item = Result<SubscriptionEvent>> + Send + '_>,
+        >,
+    ) {
+        use futures::StreamExt;
 
-        let spendable_vtxos = self.ark_client.spendable_game_vtxos(true).await?;
-        let total_vtxo: usize = spendable_vtxos.values().map(|v| v.len()).sum();
-        tracing::info!(total_vtxo, "Found spendable vtxos");
+        tracing::info!("🔄 Processing subscription stream...");
 
-        let mut batch_result = BatchProcessingResult {
-            winners: Vec::new(),
-            losers: Vec::new(),
-            donations: Vec::new(),
-        };
-
-        // First pass: collect all game results
-        for ((game_type, multiplier), outpoints) in &spendable_vtxos {
-            for outpoint in outpoints {
-                let tx_id = outpoint.outpoint.txid.to_string();
-
-                // Check if this is our own transaction
-                let is_own_tx = db::is_own_transaction(&self.db_pool, &tx_id).await;
-                let is_tx_processed = db::is_transaction_processed(&self.db_pool, &tx_id).await;
-
-                match (is_tx_processed, is_own_tx) {
-                    (Ok(false), Ok(false)) => {
-                        tracing::trace!(target : "tx_processor", tx_id, "Processing new transaction");
-
-                        if let Some(game_result) =
-                            self.evaluate_game(*game_type, multiplier, outpoint).await?
-                        {
-                            match game_result {
-                                result
-                                    if result.payout_amount.is_none()
-                                        && result.input_amount
-                                            > self.get_donation_threshold(&result.multiplier) =>
-                                {
-                                    batch_result.donations.push(result);
-                                }
-                                result if result.is_win => {
-                                    batch_result.winners.push(result);
-                                }
-                                result => {
-                                    batch_result.losers.push(result);
-                                }
-                            }
-                        }
+        while let Some(event_result) = stream.next().await {
+            match event_result {
+                Ok(event) => {
+                    if let Err(e) = self.process_single_event(event).await {
+                        tracing::error!("Error processing subscription event: {}", e);
                     }
-                    (Ok(true), _) => {
-                        tracing::trace!(target : "tx_processor", tx_id, "Transaction already processed, skipping");
-                        continue;
-                    }
-                    (_, Ok(true)) => {
-                        tracing::trace!(target : "tx_processor", tx_id, "Own transaction, skipping");
-                        continue;
-                    }
-                    (Err(e), Ok(_)) => {
-                        tracing::error!(tx_id, "Error checking if transaction is processed: {}", e);
-                    }
-                    (_, Err(e)) => {
-                        tracing::error!(tx_id, "Error checking if transaction is own: {}", e);
-                    }
+                }
+                Err(e) => {
+                    tracing::error!("Error in subscription stream: {}", e);
+                    // Add a delay before continuing to avoid tight error loops
+                    sleep(Duration::from_secs(5)).await;
                 }
             }
         }
 
-        // Second pass: process results in batches
-        self.process_batch_results(batch_result).await?;
+        tracing::warn!("📡 Subscription stream ended");
+    }
+
+    async fn process_single_event(&self, event: SubscriptionEvent) -> Result<()> {
+        let tx_id = event.txid.to_string();
+
+        tracing::debug!(tx_id, "📨 Received subscription event for tx",);
+
+        // Check if this is our own transaction
+        let is_own_tx = db::is_own_transaction(&self.db_pool, &tx_id).await;
+        let is_tx_processed = db::is_transaction_processed(&self.db_pool, &tx_id).await;
+
+        match (is_tx_processed, is_own_tx) {
+            (Ok(false), Ok(false)) => {
+                tracing::trace!(target: "tx_processor", tx_id, "Processing new subscription event");
+
+                // Find which game address this transaction is for
+                if let Some((game_type, multiplier)) =
+                    self.find_game_for_script(&event.script_pubkey)
+                {
+                    if let Some(game_result) =
+                        self.evaluate_game(game_type, &multiplier, &event).await?
+                    {
+                        // Process individual events immediately (no batching for now)
+                        match game_result {
+                            result
+                                if result.payout_amount.is_none()
+                                    && result.input_amount
+                                        > self.get_donation_threshold(&result.multiplier) =>
+                            {
+                                self.process_donation(result).await?;
+                            }
+                            result if result.is_win => {
+                                // For individual winners, use individual payout method
+                                self.process_individual_winner(result).await?;
+                            }
+                            result => {
+                                self.process_loser(result).await?;
+                            }
+                        }
+                    }
+                } else {
+                    tracing::warn!("⚠️ Received event for unknown script pubkey");
+                }
+            }
+            (Ok(true), _) => {
+                tracing::trace!(target: "tx_processor", tx_id, "Transaction already processed, skipping");
+            }
+            (_, Ok(true)) => {
+                tracing::trace!(target: "tx_processor", tx_id, "Own transaction, skipping");
+            }
+            (Err(e), Ok(_)) => {
+                tracing::error!(tx_id, "Error checking if transaction is processed: {}", e);
+            }
+            (_, Err(e)) => {
+                tracing::error!(tx_id, "Error checking if transaction is own: {}", e);
+            }
+        }
 
         Ok(())
+    }
+
+    /// Find which game corresponds to a script pubkey
+    fn find_game_for_script(
+        &self,
+        script_pubkey: &bitcoin::ScriptBuf,
+    ) -> Option<(GameType, Multiplier)> {
+        let game_addresses = self.ark_client.get_game_addresses();
+
+        for (game_type, multiplier, address) in game_addresses {
+            if address.to_p2tr_script_pubkey() == *script_pubkey {
+                return Some((game_type, multiplier));
+            }
+        }
+
+        None
     }
 
     async fn broadcast_game_result(&self, game: GameHistoryItem) {
@@ -174,9 +225,13 @@ impl TransactionProcessor {
         &self,
         game_type: GameType,
         multiplier: &Multiplier,
-        outpoint: &VirtualTxOutPoint,
+        event: &SubscriptionEvent,
     ) -> Result<Option<GameResult>> {
-        let ark_addresses = self.ark_client.get_parent_vtxo(outpoint.outpoint).await?;
+        let out_point = OutPoint {
+            txid: event.txid,
+            vout: event.vout,
+        };
+        let ark_addresses = self.ark_client.get_parent_vtxo(out_point).await?;
         let own_address = self
             .my_addresses
             .first()
@@ -186,8 +241,8 @@ impl TransactionProcessor {
         for sender_address in ark_addresses {
             if sender_address.encode() == own_address.encode() {
                 tracing::debug!(
-                    outpoint = ?outpoint.outpoint.txid,
-                    amount = ?outpoint.amount,
+                    outpoint = ?event.txid,
+                    amount = ?event.amount,
                     own_address = sender_address.encode(),
                     "Ignoring own address"
                 );
@@ -196,16 +251,16 @@ impl TransactionProcessor {
 
             let sender = sender_address.encode();
             let current_nonce = self.nonce_service.get_current_nonce().await;
-            let input_amount = outpoint.amount.to_sat();
+            let input_amount = event.amount.to_sat();
 
-            tracing::info!(outpoint = ?outpoint.outpoint.txid, amount = ?outpoint.amount, sender, "Found sender");
+            tracing::info!(outpoint = ?event.txid, amount = ?event.amount, sender, "Found sender");
 
             // Check donation threshold
             let donation_threshold = self.get_donation_threshold(multiplier);
             if input_amount > donation_threshold {
                 return Ok(Some(GameResult {
                     multiplier: *multiplier,
-                    outpoint: outpoint.clone(),
+                    outpoint: out_point,
                     sender_address,
                     sender,
                     input_amount,
@@ -218,21 +273,22 @@ impl TransactionProcessor {
 
             // Game logic - using the abstracted game system
             let game = get_game(game_type);
-            let evaluation = game.evaluate(
-                current_nonce,
-                &outpoint.outpoint.txid.to_string(),
-                multiplier,
-            );
+            let evaluation = game.evaluate(current_nonce, &out_point.txid.to_string(), multiplier);
 
             let payout_amount = if evaluation.is_win {
-                Some((input_amount as f64 * evaluation.payout_multiplier.unwrap()) as u64)
+                Some(
+                    (input_amount as f64
+                        * evaluation
+                            .payout_multiplier
+                            .expect("to have a payout multiplier")) as u64,
+                )
             } else {
                 None
             };
 
             return Ok(Some(GameResult {
                 multiplier: *multiplier,
-                outpoint: outpoint.clone(),
+                outpoint: out_point,
                 sender_address,
                 sender,
                 input_amount,
@@ -244,38 +300,6 @@ impl TransactionProcessor {
         }
 
         Ok(None)
-    }
-
-    async fn process_batch_results(&self, batch_result: BatchProcessingResult) -> Result<()> {
-        let BatchProcessingResult {
-            winners,
-            losers,
-            donations,
-        } = batch_result;
-
-        tracing::info!(
-            winners = winners.len(),
-            losers = losers.len(),
-            donations = donations.len(),
-            "Processing batch results"
-        );
-
-        // Process donations first (no payout needed)
-        for donation in donations {
-            self.process_donation(donation).await?;
-        }
-
-        // Process batch payouts for winners
-        if !winners.is_empty() {
-            self.process_batch_winners(winners).await?;
-        }
-
-        // Process losers (store results, no payout)
-        for loser in losers {
-            self.process_loser(loser).await?;
-        }
-
-        Ok(())
     }
 
     async fn process_donation(&self, donation: GameResult) -> Result<()> {
@@ -290,7 +314,7 @@ impl TransactionProcessor {
             &self.db_pool,
             &donation.current_nonce.to_string(),
             donation.rolled_number,
-            &donation.outpoint.outpoint.txid.to_string(),
+            &donation.outpoint.txid.to_string(),
             None,
             donation.input_amount as i64,
             None,
@@ -305,49 +329,14 @@ impl TransactionProcessor {
         } else {
             // Broadcast donation notification
             let donation_item = DonationItem {
-                id: format!("donation-{}", donation.outpoint.outpoint.txid),
+                id: format!("donation-{}", donation.outpoint.txid),
                 amount: Amount::from_sat(donation.input_amount),
                 sender: donation.sender,
-                input_tx_id: donation.outpoint.outpoint.txid.to_string(),
+                input_tx_id: donation.outpoint.txid.to_string(),
                 timestamp: time::OffsetDateTime::now_utc(),
             };
 
             self.broadcast_donation(donation_item).await;
-        }
-
-        Ok(())
-    }
-
-    async fn process_batch_winners(&self, winners: Vec<GameResult>) -> Result<()> {
-        if winners.is_empty() {
-            return Ok(());
-        }
-
-        let dust_value = self.ark_client.dust_value();
-        let total_payout: u64 = winners.iter().map(|w| w.payout_amount.unwrap_or(0)).sum();
-
-        tracing::info!(
-            winner_count = winners.len(),
-            total_payout = total_payout,
-            dust_threshold = dust_value.to_sat(),
-            "🎉 Processing batch payouts"
-        );
-
-        // Separate winners by payout amount (dust vs regular)
-        let (dust_winners, regular_winners): (Vec<_>, Vec<_>) =
-            winners.into_iter().partition(|winner| {
-                let payout_amount = winner.payout_amount.unwrap_or(0);
-                payout_amount < dust_value.to_sat()
-            });
-
-        // Process dust payouts individually
-        for winner in dust_winners {
-            self.process_individual_winner(winner).await?;
-        }
-
-        // Process regular payouts as batch if any exist
-        if !regular_winners.is_empty() {
-            self.process_regular_batch_winners(regular_winners).await?;
         }
 
         Ok(())
@@ -424,77 +413,6 @@ impl TransactionProcessor {
         Ok(())
     }
 
-    async fn process_regular_batch_winners(&self, winners: Vec<GameResult>) -> Result<()> {
-        // Prepare batch payment data for regular (non-dust) payouts
-        let payout_data: Vec<_> = winners
-            .iter()
-            .map(|winner| {
-                let payout_sats = winner.payout_amount.unwrap_or(0);
-                (&winner.sender_address, Amount::from_sat(payout_sats))
-            })
-            .collect();
-
-        let total_payout: u64 = winners.iter().map(|w| w.payout_amount.unwrap_or(0)).sum();
-
-        tracing::info!(
-            winner_count = winners.len(),
-            total_payout = total_payout,
-            "🎉 Processing regular batch payouts"
-        );
-
-        const MAX_RETRIES: u8 = 3;
-        let mut retry_count = 0;
-
-        loop {
-            match self.ark_client.send(payout_data.clone()).await {
-                Ok(txid) => {
-                    tracing::info!(txid = txid.to_string(), "🎉 Batch payout sent successfully");
-
-                    // Store as our own transaction
-                    if let Err(e) =
-                        db::insert_own_transaction(&self.db_pool, &txid.to_string(), "batch_payout")
-                            .await
-                    {
-                        tracing::error!("Failed to store batch payout transaction: {}", e);
-                    }
-
-                    // Process each winner individually for database and notifications
-                    for winner in winners {
-                        self.process_winner_result(winner, Some(txid.to_string()))
-                            .await?;
-                    }
-                    break;
-                }
-                Err(e) => {
-                    retry_count += 1;
-                    tracing::error!(
-                        retry = retry_count,
-                        max_retries = MAX_RETRIES,
-                        error = %e,
-                        "🚨 Failed to send batch payout"
-                    );
-
-                    if retry_count >= MAX_RETRIES {
-                        tracing::error!(
-                            "🚨 Max retries exceeded for batch payout, processing as failed winners"
-                        );
-                        for winner in winners {
-                            self.process_winner_result(winner, None).await?;
-                        }
-                        break;
-                    } else {
-                        // Wait before retrying (exponential backoff)
-                        let delay_ms = 1000 * (2_u64.pow(retry_count as u32 - 1));
-                        tracing::info!("Retrying batch payout in {}ms...", delay_ms);
-                        sleep(Duration::from_millis(delay_ms)).await;
-                    }
-                }
-            }
-        }
-
-        Ok(())
-    }
-
     async fn process_winner_result(
         &self,
         winner: GameResult,
@@ -505,7 +423,7 @@ impl TransactionProcessor {
             &self.db_pool,
             &winner.current_nonce.to_string(),
             winner.rolled_number,
-            &winner.outpoint.outpoint.txid.to_string(),
+            &winner.outpoint.txid.to_string(),
             payout_txid.as_deref(),
             winner.input_amount as i64,
             winner.payout_amount.map(|p| p as i64),
@@ -532,7 +450,7 @@ impl TransactionProcessor {
                 target_number: (65536.0 * 1000.0 / winner.multiplier.multiplier() as f64) as i64,
                 is_win: true,
                 payout: winner.payout_amount.map(Amount::from_sat),
-                input_tx_id: winner.outpoint.outpoint.txid.to_string(),
+                input_tx_id: winner.outpoint.txid.to_string(),
                 output_tx_id: payout_txid,
                 nonce: revealable_nonce,
                 nonce_hash,
@@ -558,7 +476,7 @@ impl TransactionProcessor {
             &self.db_pool,
             &loser.current_nonce.to_string(),
             loser.rolled_number,
-            &loser.outpoint.outpoint.txid.to_string(),
+            &loser.outpoint.txid.to_string(),
             None,
             loser.input_amount as i64,
             None,
@@ -585,7 +503,7 @@ impl TransactionProcessor {
                 target_number: (65536.0 * 1000.0 / loser.multiplier.multiplier() as f64) as i64,
                 is_win: false,
                 payout: None,
-                input_tx_id: loser.outpoint.outpoint.txid.to_string(),
+                input_tx_id: loser.outpoint.txid.to_string(),
                 output_tx_id: None,
                 nonce: revealable_nonce,
                 nonce_hash,
@@ -602,7 +520,6 @@ impl TransactionProcessor {
 pub async fn spawn_transaction_monitor(
     ark_client: Arc<ArkClient>,
     my_addresses: Vec<ArkAddress>,
-    check_interval_seconds: u64,
     nonce_service: NonceService,
     db_pool: Pool<Sqlite>,
     broadcaster: SharedBroadcaster,
@@ -611,7 +528,6 @@ pub async fn spawn_transaction_monitor(
     let processor = TransactionProcessor::new(
         ark_client,
         my_addresses,
-        check_interval_seconds,
         nonce_service,
         db_pool,
         broadcaster,
@@ -675,7 +591,7 @@ mod tests {
         expected_win_rate: f64,
         stats: HashMap<&'static str, usize>,
     ) {
-        println!("\n=== {} ({}x) ===", multiplier_name, multiplier_value);
+        println!("\n=== {multiplier_name} ({multiplier_value}x) ===");
         println!("Iterations: {}", stats["total"]);
         println!("Wins: {} | Losses: {}", stats["wins"], stats["losses"]);
         println!("Expected win rate: {expected_win_rate:.2}%",);
