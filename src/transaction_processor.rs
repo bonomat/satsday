@@ -78,8 +78,9 @@ impl TransactionProcessor {
         let subscription_id = match self.ark_client.subscribe_to_scripts(scripts).await {
             Ok(id) => id,
             Err(e) => {
-                tracing::error!("Failed to subscribe to scripts: {}", e);
-                return;
+                tracing::error!("🚨 CRITICAL: Failed to subscribe to game addresses: {}", e);
+                tracing::error!("🚨 CRITICAL: Exiting service to force restart");
+                std::process::exit(1);
             }
         };
 
@@ -89,14 +90,22 @@ impl TransactionProcessor {
         );
 
         // Get subscription stream and process events
-        match self.ark_client.get_subscription(subscription_id).await {
-            Ok(stream) => {
-                self.process_subscription_stream(stream).await;
-            }
+        let stream = match self.ark_client.get_subscription(subscription_id).await {
+            Ok(stream) => stream,
             Err(e) => {
-                tracing::error!("Failed to get subscription stream: {}", e);
+                tracing::error!("🚨 CRITICAL: Failed to get subscription stream: {}", e);
+                tracing::error!("🚨 CRITICAL: Exiting service to force restart");
+                std::process::exit(1);
             }
-        }
+        };
+
+        // Process the stream - if this returns, the stream has ended
+        self.process_subscription_stream(stream).await;
+
+        // If we reach this point, the subscription stream has ended unexpectedly
+        tracing::error!("🚨 CRITICAL: Subscription stream ended unexpectedly");
+        tracing::error!("🚨 CRITICAL: Exiting service to force restart");
+        std::process::exit(1);
     }
 
     async fn process_subscription_stream(
@@ -124,7 +133,7 @@ impl TransactionProcessor {
             }
         }
 
-        tracing::warn!("📡 Subscription stream ended");
+        tracing::info!("📡 Subscription stream processing completed");
     }
 
     async fn process_single_event(&self, event: SubscriptionEvent) -> Result<()> {

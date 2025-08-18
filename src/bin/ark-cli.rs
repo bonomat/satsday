@@ -123,14 +123,19 @@ async fn main() -> Result<()> {
         },
         Commands::Stats => {
             let game_addresses = client.get_game_addresses();
-            let game_addresses
-                = game_addresses.into_iter().map(|(_, _, address)| address).collect::<Vec<_>>();
+            let game_addresses = game_addresses
+                .into_iter()
+                .map(|(_, _, address)| address)
+                .collect::<Vec<_>>();
 
             let vtxos = client.list_vtxos(game_addresses.as_slice()).await?;
             tracing::info!(number = vtxos.len(), "Total games");
-            for (game, multiplier, ark_address)  in client.get_game_addresses() {
-                let per_address = vtxos.iter().filter(|vtxo| vtxo.script == ark_address.to_p2tr_script_pubkey()).collect::<Vec<_>>();
-                let total_received: bitcoin::Amount = per_address.iter().map(|v|v.amount).sum();
+            for (game, multiplier, ark_address) in client.get_game_addresses() {
+                let per_address = vtxos
+                    .iter()
+                    .filter(|vtxo| vtxo.script == ark_address.to_p2tr_script_pubkey())
+                    .collect::<Vec<_>>();
+                let total_received: bitcoin::Amount = per_address.iter().map(|v| v.amount).sum();
                 tracing::info!(
                     number_of_games = per_address.len(),
                     total_received = %total_received,
@@ -139,7 +144,6 @@ async fn main() -> Result<()> {
 
                 );
             }
-
         }
     }
 

@@ -336,7 +336,7 @@ async fn get_stats(State(state): State<AppState>) -> Result<Json<StatsResponse>,
             .iter()
             .filter(|vtxo| vtxo.script == ark_address.to_p2tr_script_pubkey())
             .collect();
-        
+
         let total_received: Amount = per_address.iter().map(|v| v.amount).sum();
 
         game_stats.push(GameStatsItem {

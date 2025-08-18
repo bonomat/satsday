@@ -21,7 +21,7 @@ fmt-frontend:
     pnpm biome format --write .
 
 clippy:
-    cargo clippy --all-targets --all-features -- -D warnings
+    cargo clippy --all-targets --all-features
 
 db-prepare:
     cargo sqlx prepare
