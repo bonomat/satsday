@@ -443,6 +443,18 @@ impl ArkClient {
         Ok((vtxo, spendable))
     }
 
+    /// Lists all VTXOs for the given addresses, spent, recoverable and unspent
+    pub async fn list_vtxos(
+        &self,
+        addresses: &[ArkAddress],
+    ) -> Result<Vec<ark_core::server::VirtualTxOutPoint>> {
+        let request = GetVtxosRequest::new_for_addresses(addresses);
+
+        let vtxo_outpoints = self.grpc_client.list_vtxos(request).await?;
+
+        Ok(vtxo_outpoints.all())
+    }
+
     async fn settle_internal(
         &self,
         vtxos: VirtualTxOutPoints,

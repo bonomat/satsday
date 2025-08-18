@@ -50,6 +50,9 @@ address:
 game-addresses:
     cargo run -- --config {{ CONFIG_FILE }} game-addresses
 
+stats:
+    cargo run -- --config {{ CONFIG_FILE }} stats
+
 send address amount:
     cargo run -- --config {{ CONFIG_FILE }} send {{ address }} {{ amount }}
 
