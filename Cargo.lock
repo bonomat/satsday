@@ -106,7 +106,6 @@ checksum = "e16d2d3311acee920a9eb8d33b8cbc1787ce4a264e85f964c2404b969bdcd487"
 [[package]]
 name = "ark-core"
 version = "0.7.0"
-source = "git+https://github.com/arkade-os/rust-sdk.git?rev=f64b4#f64b455123e310e1c3d40ac91c5e193104331827"
 dependencies = [
  "ark-secp256k1",
  "bech32",
@@ -123,7 +122,6 @@ dependencies = [
 [[package]]
 name = "ark-grpc"
 version = "0.7.0"
-source = "git+https://github.com/arkade-os/rust-sdk.git?rev=f64b4#f64b455123e310e1c3d40ac91c5e193104331827"
 dependencies = [
  "ark-core",
  "async-stream",
@@ -141,7 +139,6 @@ dependencies = [
 [[package]]
 name = "ark-secp256k1"
 version = "0.31.0"
-source = "git+https://github.com/arkade-os/rust-sdk.git?rev=f64b4#f64b455123e310e1c3d40ac91c5e193104331827"
 dependencies = [
  "bitcoin_hashes",
  "rand 0.9.1",
@@ -2672,7 +2669,6 @@ dependencies = [
 [[package]]
 name = "secp256k1-sys"
 version = "0.11.0"
-source = "git+https://github.com/arkade-os/rust-sdk.git?rev=f64b4#f64b455123e310e1c3d40ac91c5e193104331827"
 dependencies = [
  "cc",
 ]
