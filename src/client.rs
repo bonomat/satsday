@@ -9,12 +9,10 @@ use anyhow::Result;
 use ark_core::batch;
 use ark_core::batch::create_and_sign_forfeit_txs;
 use ark_core::batch::generate_nonce_tree;
-use ark_core::batch::sign_batch_tree;
 use ark_core::batch::sign_commitment_psbt;
 use ark_core::boarding_output::list_boarding_outpoints;
 use ark_core::boarding_output::BoardingOutpoints;
 use ark_core::coin_select::select_vtxos;
-use ark_core::proof_of_funds;
 use ark_core::send;
 use ark_core::send::build_offchain_transactions;
 use ark_core::send::sign_ark_transaction;
@@ -105,19 +103,19 @@ impl ArkClient {
         let esplora_client = EsploraClient::new(&config.esplora_url)?;
 
         // Create main VTXO
-        let main_vtxo = Vtxo::new(
+        let main_vtxo = Vtxo::new_default(
             &secp,
-            server_info.pk.x_only_public_key().0,
+            server_info.signer_pk.x_only_public_key().0,
             main_pk.x_only_public_key().0,
-            vec![],
             server_info.unilateral_exit_delay,
             server_info.network,
         )?;
 
+
         // Create boarding output
         let boarding_output = BoardingOutput::new(
             &secp,
-            server_info.pk.x_only_public_key().0,
+            server_info.signer_pk.x_only_public_key().0,
             main_pk.x_only_public_key().0,
             server_info.boarding_exit_delay,
             server_info.network,
@@ -130,11 +128,10 @@ impl ArkClient {
             let game_sk = SecretKey::from_slice(&game_sk_bytes)?;
             let game_pk = PublicKey::from_secret_key(&secp, &game_sk);
 
-            let game_vtxo = Vtxo::new(
+            let game_vtxo = Vtxo::new_default(
                 &secp,
-                server_info.pk.x_only_public_key().0,
+                server_info.signer_pk.x_only_public_key().0,
                 game_pk.x_only_public_key().0,
-                vec![],
                 server_info.unilateral_exit_delay,
                 server_info.network,
             )?;

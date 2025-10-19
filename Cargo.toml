@@ -9,8 +9,8 @@ path = "src/bin/ark-cli.rs"
 
 [dependencies]
 anyhow = "1"
-ark-core = { git = "https://github.com/coblox/ark-rs.git", rev = "33c0de0" }
-ark-grpc = { git = "https://github.com/coblox/ark-rs.git", rev = "33c0de0" }
+ark-core = { git = "https://github.com/arkade-os/rust-sdk.git", rev = "f64b4" }
+ark-grpc = { git = "https://github.com/arkade-os/rust-sdk.git", rev = "f64b4" }
 async-stream = "0.3"
 atty = "0.2.14"
 axum = { version = "0.8", features = ["ws"] }
