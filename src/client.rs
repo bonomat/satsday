@@ -201,60 +201,76 @@ impl ArkClient {
             tracing::debug!(target: "client", address = address.encode(), amount = amount.to_string(), "Sending money to");
         }
 
-        let virtual_tx_outpoints = {
-            let spendable_vtxos = self.spendable_offchain_vtxos(false).await?;
-            let mut spendable = vec![];
-            for (vtxo, outpoints) in spendable_vtxos {
-                for outpoint in outpoints {
-                    spendable.push((outpoint, vtxo.clone()));
-                }
-            }
-            VirtualTxOutPoints {
-                spendable,
-                // TODO: we should check for expired as well
-                expired: vec![],
-            }
-        };
-        let vtxo_outpoints = virtual_tx_outpoints
-            .spendable
+        // Recoverable VTXOs cannot be sent.
+        let select_recoverable_vtxos = false;
+
+        let spendable_vtxos = self.spendable_offchain_vtxos(select_recoverable_vtxos).await?;
+
+        // Run coin selection algorithm on candidate spendable VTXOs.
+        let spendable_virtual_tx_outpoints = spendable_vtxos
             .iter()
-            .map(|(outpoint, _)| ark_core::coin_select::VirtualTxOutPoint {
-                outpoint: outpoint.outpoint,
-                expire_at: outpoint.expires_at,
-                amount: outpoint.amount,
+            .flat_map(|(_, vtxos)| vtxos.clone())
+            .map(|vtxo| ark_core::coin_select::VirtualTxOutPoint {
+                outpoint: vtxo.outpoint,
+                expire_at: vtxo.expires_at,
+                amount: vtxo.amount,
             })
             .collect::<Vec<_>>();
 
         let total_amount = address_amounts.iter().map(|(_, amount)| *amount).sum();
 
-        let selected_outpoints = if total_amount == Amount::ZERO {
-            vtxo_outpoints
+        let selected_coins = if total_amount == Amount::ZERO {
+            spendable_virtual_tx_outpoints
         } else {
-            select_vtxos(vtxo_outpoints, total_amount, self.server_info.dust, true)?
+            select_vtxos(
+                spendable_virtual_tx_outpoints,
+                total_amount,
+                self.server_info.dust,
+                true,
+            )?
         };
 
-        let vtxo_inputs = virtual_tx_outpoints
-            .spendable
+        let vtxo_inputs = selected_coins
             .into_iter()
-            .filter(|(outpoint, _)| {
-                selected_outpoints
-                    .iter()
-                    .any(|o| o.outpoint == outpoint.outpoint)
+            .map(|virtual_tx_outpoint| {
+                let vtxo = spendable_vtxos
+                    .clone()
+                    .into_iter()
+                    .find_map(|(vtxo, virtual_tx_outpoints)| {
+                        virtual_tx_outpoints
+                            .iter()
+                            .any(|v| v.outpoint == virtual_tx_outpoint.outpoint)
+                            .then_some(vtxo)
+                    })
+                    .expect("to find matching VTXO");
+
+                let (forfeit_script, control_block) = vtxo
+                    .forfeit_spend_info()
+                    .context("failed to get forfeit spend info")?;
+
+                Ok(send::VtxoInput::new(
+                    forfeit_script,
+                    None,
+                    control_block,
+                    vtxo.tapscripts(),
+                    vtxo.script_pubkey(),
+                    virtual_tx_outpoint.amount,
+                    virtual_tx_outpoint.outpoint,
+                ))
             })
-            .map(|(outpoint, vtxo)| send::VtxoInput::new(vtxo, outpoint.amount, outpoint.outpoint))
-            .collect::<Vec<_>>();
+            .collect::<Result<Vec<_>>>()?;
 
         let (main_address, _) = &self.main_address;
         let change_address = main_address.to_ark_address();
 
         let OffchainTransactions {
-            checkpoint_txs,
             mut ark_tx,
+            checkpoint_txs,
         } = build_offchain_transactions(
             address_amounts.as_slice(),
             Some(&change_address),
             &vtxo_inputs,
-            self.server_info.dust,
+            &self.server_info,
         )?;
 
         let mut all_keys = vec![self.main_address.clone()];
@@ -262,15 +278,18 @@ impl ArkClient {
             all_keys.push((game_address.vtxo.clone(), game_address.secret_key));
         }
 
-        let sign_fn = |msg: secp256k1::Message,
-                       vtxo: &Vtxo|
+        let sign_fn = |_: &mut bitcoin::psbt::Input,
+                       msg: secp256k1::Message|
          -> Result<(schnorr::Signature, XOnlyPublicKey), ark_core::Error> {
             let kp = all_keys.iter().find_map(|(v, sk)| {
-                if v.to_ark_address().encode() == vtxo.to_ark_address().encode() {
-                    Some(sk.keypair(&self.secp))
-                } else {
-                    None
-                }
+                // Try to match against all VTXOs we're spending
+                vtxo_inputs.iter().find_map(|input| {
+                    if input.spend_info().0 == &v.script_pubkey() {
+                        Some(sk.keypair(&self.secp))
+                    } else {
+                        None
+                    }
+                })
             });
             let kp = kp
                 .context("Key not found for vtxo")
@@ -281,58 +300,28 @@ impl ArkClient {
             Ok((sig, pk))
         };
 
-        for (i, (_, _, _, vtxo)) in checkpoint_txs.iter().enumerate() {
-            sign_ark_transaction(
-                |msg| sign_fn(msg, vtxo),
-                &mut ark_tx,
-                &checkpoint_txs
-                    .iter()
-                    .map(|(_, output, outpoint, _)| (output.clone(), *outpoint))
-                    .collect::<Vec<_>>(),
-                i,
-            )?;
+        for i in 0..checkpoint_txs.len() {
+            sign_ark_transaction(sign_fn, &mut ark_tx, i)?;
         }
 
-        let virtual_txid = ark_tx.unsigned_tx.compute_txid();
+        let ark_txid = ark_tx.unsigned_tx.compute_txid();
 
         let mut res = self
             .grpc_client
-            .submit_offchain_transaction_request(
-                ark_tx,
-                checkpoint_txs
-                    .into_iter()
-                    .map(|(psbt, _, _, _)| psbt)
-                    .collect(),
-            )
+            .submit_offchain_transaction_request(ark_tx, checkpoint_txs)
             .await
             .context("failed to submit offchain transaction request")?;
 
         for checkpoint_psbt in res.signed_checkpoint_txs.iter_mut() {
-            let vtxo_input = vtxo_inputs
-                .iter()
-                .find(|input| {
-                    checkpoint_psbt.unsigned_tx.input[0].previous_output == input.outpoint()
-                })
-                .with_context(|| {
-                    format!(
-                        "could not find VTXO input for checkpoint transaction {}",
-                        checkpoint_psbt.unsigned_tx.compute_txid(),
-                    )
-                })?;
-
-            sign_checkpoint_transaction(
-                |msg| sign_fn(msg, vtxo_input.vtxo()),
-                checkpoint_psbt,
-                vtxo_input,
-            )?;
+            sign_checkpoint_transaction(sign_fn, checkpoint_psbt)?;
         }
 
         self.grpc_client
-            .finalize_offchain_transaction(virtual_txid, res.signed_checkpoint_txs)
+            .finalize_offchain_transaction(ark_txid, res.signed_checkpoint_txs)
             .await
             .context("failed to finalize offchain transaction")?;
 
-        Ok(virtual_txid)
+        Ok(ark_txid)
     }
 
     pub async fn settle(&self) -> Result<Option<Txid>> {
