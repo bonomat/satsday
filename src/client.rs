@@ -6,8 +6,8 @@ use crate::key_derivation::Multiplier;
 use anyhow::bail;
 use anyhow::Context;
 use anyhow::Result;
-use ark_core::batch;
-use ark_core::batch::create_and_sign_forfeit_txs;
+use ark_core::{batch, intent};
+use ark_core::batch::{create_and_sign_forfeit_txs, sign_batch_tree_tx};
 use ark_core::batch::generate_nonce_tree;
 use ark_core::batch::sign_commitment_psbt;
 use ark_core::boarding_output::list_boarding_outpoints;
@@ -459,7 +459,7 @@ impl ArkClient {
         let round_inputs = {
             let boarding_inputs = boarding_outputs.spendable.clone().into_iter().map(
                 |(outpoint, amount, boarding_output)| {
-                    proof_of_funds::Input::new(
+                    intent::Input::new(
                         outpoint,
                         boarding_output.exit_delay(),
                         TxOut {
@@ -480,7 +480,7 @@ impl ArkClient {
                     .clone()
                     .into_iter()
                     .map(|(virtual_tx_outpoint, vtxo)| {
-                        proof_of_funds::Input::new(
+                        intent::Input::new(
                             virtual_tx_outpoint.outpoint,
                             vtxo.exit_delay(),
                             TxOut {
@@ -489,7 +489,7 @@ impl ArkClient {
                             },
                             vtxo.tapscripts(),
                             vtxo.owner_pk(),
-                            vtxo.exit_spend_info(),
+                            vtxo.exit_spend_info().expect("to have exit spend info"),
                             false,
                         )
                     });
@@ -499,7 +499,7 @@ impl ArkClient {
         let n_round_inputs = round_inputs.len();
 
         let spendable_amount = boarding_outputs.spendable_balance() + vtxos.spendable_balance();
-        let round_outputs = vec![proof_of_funds::Output::Offchain(TxOut {
+        let round_outputs = vec![intent::Output::Offchain(TxOut {
             value: spendable_amount,
             script_pubkey: to_address.to_p2tr_script_pubkey(),
         })];
@@ -525,7 +525,7 @@ impl ArkClient {
             Ok(self.secp.sign_schnorr_no_aux_rand(msg, &main_signing_kp))
         };
 
-        let (bip322_proof, intent_message) = proof_of_funds::make_bip322_signature(
+        let signature = intent::make_intent(
             signing_kps.as_slice(),
             sign_for_onchain_pk_fn,
             round_inputs,
@@ -535,7 +535,7 @@ impl ArkClient {
 
         let intent_id = self
             .grpc_client
-            .register_intent(&intent_message, &bip322_proof)
+            .register_intent(signature)
             .await?;
 
         let topics = vtxos
@@ -621,14 +621,15 @@ impl ArkClient {
         let round_id = round_signing_nonces_generated_event.id;
         let agg_pub_nonce_tree = round_signing_nonces_generated_event.tree_nonces;
 
-        let partial_sig_tree = sign_batch_tree(
-            self.server_info.vtxo_tree_expiry,
-            self.server_info.pk.x_only_public_key().0,
-            &cosigner_kp,
-            &vtxo_graph,
-            &round_signing_event.unsigned_commitment_tx,
-            nonce_tree,
-            &agg_pub_nonce_tree,
+        let partial_sig_tree = sign_batch_tree_tx(
+
+            // self.server_info.vtxo_tree_expiry,
+            // self.server_info.pk.x_only_public_key().0,
+            // &cosigner_kp,
+            // &vtxo_graph,
+            // &round_signing_event.unsigned_commitment_tx,
+            // nonce_tree,
+            // &agg_pub_nonce_tree,
         )?;
 
         self.grpc_client
