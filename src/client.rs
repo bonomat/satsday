@@ -7,7 +7,7 @@ use anyhow::bail;
 use anyhow::Context;
 use anyhow::Result;
 use ark_core::{batch, intent};
-use ark_core::batch::{create_and_sign_forfeit_txs, sign_batch_tree_tx, aggregate_nonces, PartialSigTree, NonceKps};
+use ark_core::batch::{create_and_sign_forfeit_txs, sign_batch_tree_tx, aggregate_nonces, NonceKps};
 use ark_core::batch::generate_nonce_tree;
 use ark_core::batch::sign_commitment_psbt;
 use ark_core::boarding_output::list_boarding_outpoints;
@@ -18,7 +18,7 @@ use ark_core::send::build_offchain_transactions;
 use ark_core::send::sign_ark_transaction;
 use ark_core::send::sign_checkpoint_transaction;
 use ark_core::send::OffchainTransactions;
-use ark_core::server::BatchTreeEventType;
+use ark_core::server::{BatchTreeEventType, PartialSigTree, SubscriptionResponse};
 use ark_core::server::GetVtxosRequest;
 use ark_core::server::StreamEvent;
 use ark_core::vtxo::list_virtual_tx_outpoints;
@@ -852,7 +852,7 @@ impl ArkClient {
                         .clone();
                     let txout =
                         option.ok_or_else(|| ark_core::Error::ad_hoc("Could not find input"))?;
-                    let server_x_only = self.server_info.pk.x_only_public_key();
+                    let server_x_only = self.server_info.signer_pk.x_only_public_key();
                     let buf = &txout.script_pubkey;
                     let ark_address =
                         get_address_from_output(buf, server_x_only.0, self.server_info.network)
@@ -944,7 +944,7 @@ impl ArkClient {
         let stream = async_stream::stream! {
             while let Some(result) = subscription_stream.next().await {
                 match result {
-                    Ok(response) => {
+                    Ok(SubscriptionResponse::Event(response)) => {
                         // Get the transaction details
                         let psbt = if let Some(psbt) = response.tx {
                             psbt
@@ -988,7 +988,7 @@ impl ArkClient {
                         tracing::error!("Error receiving subscription response: {}", e);
                         yield Err(anyhow::anyhow!("Subscription error: {}", e));
                     }
-                }
+                Ok(SubscriptionResponse::Heartbeat) => {}}
             }
         };
 
