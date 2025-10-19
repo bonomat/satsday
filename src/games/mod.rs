@@ -35,8 +35,9 @@ pub fn get_game(game_type: GameType) -> Box<dyn Game> {
 }
 
 /// Enum of available game types
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+#[derive(Default, Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub enum GameType {
+    #[default]
     SatoshisNumber,
     // Future games can be added here
     // HighLow,
@@ -44,11 +45,6 @@ pub enum GameType {
     // CoinFlip,
 }
 
-impl Default for GameType {
-    fn default() -> Self {
-        GameType::SatoshisNumber
-    }
-}
 
 impl fmt::Display for GameType {
     fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {

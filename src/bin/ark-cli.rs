@@ -43,6 +43,11 @@ enum Commands {
 async fn main() -> Result<()> {
     logger::init_tracing(LevelFilter::DEBUG, false)?;
 
+    rustls::crypto::ring::default_provider()
+        .install_default()
+        .expect("to be able to install crypto providers");
+
+
     let cli = Cli::parse();
 
     let config = Config::from_file(&cli.config)?;

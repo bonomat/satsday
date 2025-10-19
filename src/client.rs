@@ -7,7 +7,7 @@ use anyhow::bail;
 use anyhow::Context;
 use anyhow::Result;
 use ark_core::{batch, intent};
-use ark_core::batch::{create_and_sign_forfeit_txs, sign_batch_tree_tx, aggregate_nonces, NonceKps};
+use ark_core::batch::{create_and_sign_forfeit_txs, sign_batch_tree_tx, aggregate_nonces};
 use ark_core::batch::generate_nonce_tree;
 use ark_core::batch::sign_commitment_psbt;
 use ark_core::boarding_output::list_boarding_outpoints;
