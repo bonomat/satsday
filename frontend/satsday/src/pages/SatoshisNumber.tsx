@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Slider } from "@/components/ui/slider";
@@ -44,9 +44,9 @@ export default function SatoshisNumber() {
   const [amount, setAmount] = useState("1000");
   const [isSending, setIsSending] = useState(false);
 
-  const handlePaymentReceived = (notification: { address?: string; amount: number; txid: string }) => {
+  const handlePaymentReceived = useCallback((notification: { address?: string; amount: number; txid: string }) => {
     console.log("[SatoshisNumber] Payment received:", notification);
-    
+
     // Show celebration toast
     toast.success(
       `Payment received! ${notification.amount.toLocaleString()} sats`,
@@ -57,7 +57,7 @@ export default function SatoshisNumber() {
     );
 
     // You can add more animations here (e.g., confetti)
-  };
+  }, []);
 
   const { isAvailable: isBridgeAvailable, isChecking: isBridgeChecking, client: bridgeClient } = useWalletBridge(handlePaymentReceived);
 
