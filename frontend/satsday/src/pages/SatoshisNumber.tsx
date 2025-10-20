@@ -2,7 +2,7 @@ import { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Slider } from "@/components/ui/slider";
-import { Copy, Loader2, Shield } from "lucide-react";
+import { Copy, Loader2, Shield, Dices } from "lucide-react";
 import { toast } from "sonner";
 import { Link } from "react-router-dom";
 import Navbar from "@/components/Navbar";
@@ -12,6 +12,17 @@ import { useAsync } from "react-use";
 import QRCode from "react-qr-code";
 import HowItWorks from "@/components/HowItWorks.tsx";
 import ActivityFeed from "@/components/ActivityFeed";
+import { useWalletBridge } from "@/hooks/useWalletBridge";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
 
 // Calculate bet details based on slider value (2-100)
 const calculateBetDetails = (number: number) => {
@@ -29,6 +40,11 @@ const calculateBetDetails = (number: number) => {
 
 export default function SatoshisNumber() {
   const [betNumber, setBetNumber] = useState([4]);
+  const [isDialogOpen, setIsDialogOpen] = useState(false);
+  const [amount, setAmount] = useState("1000");
+  const [isSending, setIsSending] = useState(false);
+
+  const { isAvailable: isBridgeAvailable, isChecking: isBridgeChecking, client: bridgeClient } = useWalletBridge();
 
   // Scroll to top when component mounts
   useEffect(() => {
@@ -60,6 +76,39 @@ export default function SatoshisNumber() {
       toast.success("Address copied to clipboard!");
     } catch (error) {
       toast.error("Failed to copy address");
+    }
+  };
+
+  const handleRollTheDice = async () => {
+    if (!bridgeClient || !selectedAddress) {
+      toast.error("Bridge client not available");
+      return;
+    }
+
+    const amountSats = parseInt(amount);
+    if (isNaN(amountSats) || amountSats <= 0) {
+      toast.error("Please enter a valid amount");
+      return;
+    }
+
+    if (maxSendAmount > 0 && amountSats > maxSendAmount) {
+      toast.error(`Maximum bet amount is ${maxSendAmount.toLocaleString()} sats`);
+      return;
+    }
+
+    setIsSending(true);
+    try {
+      const txid = await bridgeClient.sendToAddress(
+        selectedAddress.address,
+        amountSats
+      );
+      toast.success(`Transaction sent! TXID: ${txid.substring(0, 8)}...`);
+      setIsDialogOpen(false);
+      setAmount("1000"); // Reset to default
+    } catch (error) {
+      toast.error(`Failed to send: ${error instanceof Error ? error.message : "Unknown error"}`);
+    } finally {
+      setIsSending(false);
     }
   };
 
@@ -233,6 +282,20 @@ export default function SatoshisNumber() {
                     </Button>
                   </div>
 
+                  {/* Roll the Dice Button - Only shown when bridge is available */}
+                  {!isBridgeChecking && isBridgeAvailable && (
+                    <div className="mt-4">
+                      <Button
+                        onClick={() => setIsDialogOpen(true)}
+                        className="w-full max-w-xs bg-gradient-to-r from-primary to-orange-500 hover:from-primary/90 hover:to-orange-500/90"
+                        size="lg"
+                      >
+                        <Dices className="w-5 h-5 mr-2" />
+                        Roll the Dice
+                      </Button>
+                    </div>
+                  )}
+
                   {/* Instructions */}
                   <div className="text-sm text-muted-foreground max-w-md mx-auto space-y-3">
                     <p>
@@ -281,6 +344,74 @@ export default function SatoshisNumber() {
       </div>
 
       <Footer />
+
+      {/* Roll the Dice Dialog */}
+      <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
+        <DialogContent className="sm:max-w-[425px]">
+          <DialogHeader>
+            <DialogTitle>Roll the Dice</DialogTitle>
+            <DialogDescription>
+              Enter the amount you want to bet. If Satoshi's number is{" "}
+              {selectedAddress?.max_roll || betNumber[0]} or lower, you win{" "}
+              {selectedAddress?.multiplier || `${betDetails.multiplier}x`} your bet!
+            </DialogDescription>
+          </DialogHeader>
+          <div className="grid gap-4 py-4">
+            <div className="grid grid-cols-4 items-center gap-4">
+              <Label htmlFor="amount" className="text-right">
+                Amount
+              </Label>
+              <div className="col-span-3 relative">
+                <Input
+                  id="amount"
+                  type="number"
+                  value={amount}
+                  onChange={(e) => setAmount(e.target.value)}
+                  placeholder="1000"
+                  className="pr-12"
+                  disabled={isSending}
+                />
+                <span className="absolute right-3 top-1/2 -translate-y-1/2 text-sm text-muted-foreground">
+                  sats
+                </span>
+              </div>
+            </div>
+            {maxSendAmount > 0 && (
+              <div className="text-xs text-muted-foreground">
+                Maximum bet: {maxSendAmount.toLocaleString()} sats
+              </div>
+            )}
+          </div>
+          <DialogFooter>
+            <Button
+              type="button"
+              variant="outline"
+              onClick={() => setIsDialogOpen(false)}
+              disabled={isSending}
+            >
+              Cancel
+            </Button>
+            <Button
+              type="submit"
+              onClick={handleRollTheDice}
+              disabled={isSending}
+              className="bg-gradient-to-r from-primary to-orange-500"
+            >
+              {isSending ? (
+                <>
+                  <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                  Sending...
+                </>
+              ) : (
+                <>
+                  <Dices className="w-4 h-4 mr-2" />
+                  Send & Roll
+                </>
+              )}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
