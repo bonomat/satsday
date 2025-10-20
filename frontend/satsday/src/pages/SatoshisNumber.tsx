@@ -44,7 +44,22 @@ export default function SatoshisNumber() {
   const [amount, setAmount] = useState("1000");
   const [isSending, setIsSending] = useState(false);
 
-  const { isAvailable: isBridgeAvailable, isChecking: isBridgeChecking, client: bridgeClient } = useWalletBridge();
+  const handlePaymentReceived = (notification: { address?: string; amount: number; txid: string }) => {
+    console.log("[SatoshisNumber] Payment received:", notification);
+    
+    // Show celebration toast
+    toast.success(
+      `Payment received! ${notification.amount.toLocaleString()} sats`,
+      {
+        description: `TXID: ${notification.txid.substring(0, 12)}...`,
+        duration: 5000,
+      }
+    );
+
+    // You can add more animations here (e.g., confetti)
+  };
+
+  const { isAvailable: isBridgeAvailable, isChecking: isBridgeChecking, client: bridgeClient } = useWalletBridge(handlePaymentReceived);
 
   // Scroll to top when component mounts
   useEffect(() => {
@@ -73,39 +88,47 @@ export default function SatoshisNumber() {
   const copyToClipboard = async (text: string) => {
     try {
       await navigator.clipboard.writeText(text);
+      console.log("[SatoshisNumber] Address copied to clipboard:", text);
       toast.success("Address copied to clipboard!");
     } catch (error) {
+      console.error("[SatoshisNumber] Failed to copy address:", error);
       toast.error("Failed to copy address");
     }
   };
 
   const handleRollTheDice = async () => {
     if (!bridgeClient || !selectedAddress) {
+      console.error("[SatoshisNumber] Bridge client not available");
       toast.error("Bridge client not available");
       return;
     }
 
     const amountSats = parseInt(amount);
     if (isNaN(amountSats) || amountSats <= 0) {
+      console.error("[SatoshisNumber] Invalid amount:", amount);
       toast.error("Please enter a valid amount");
       return;
     }
 
     if (maxSendAmount > 0 && amountSats > maxSendAmount) {
+      console.error("[SatoshisNumber] Amount exceeds maximum:", amountSats, "max:", maxSendAmount);
       toast.error(`Maximum bet amount is ${maxSendAmount.toLocaleString()} sats`);
       return;
     }
 
     setIsSending(true);
     try {
+      console.log("[SatoshisNumber] Sending to address:", selectedAddress.address, "amount:", amountSats);
       const txid = await bridgeClient.sendToAddress(
         selectedAddress.address,
         amountSats
       );
+      console.log("[SatoshisNumber] Transaction sent! TXID:", txid);
       toast.success(`Transaction sent! TXID: ${txid.substring(0, 8)}...`);
       setIsDialogOpen(false);
       setAmount("1000"); // Reset to default
     } catch (error) {
+      console.error("[SatoshisNumber] Failed to send:", error);
       toast.error(`Failed to send: ${error instanceof Error ? error.message : "Unknown error"}`);
     } finally {
       setIsSending(false);

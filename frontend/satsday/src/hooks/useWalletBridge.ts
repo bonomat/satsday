@@ -1,11 +1,14 @@
 import { useState, useEffect, useRef } from "react";
-import { LendasatClient } from "@bonomat/satsday-wallet-bridge";
+import { LendasatClient, type PaymentReceivedNotification } from "@bonomat/satsday-wallet-bridge";
 
 /**
  * Hook to detect if app is running in an iframe with a functional wallet bridge
+ * @param onPaymentReceived - Optional callback for payment received notifications
  * @returns Object containing bridge client and availability status
  */
-export function useWalletBridge() {
+export function useWalletBridge(
+  onPaymentReceived?: (notification: PaymentReceivedNotification) => void
+) {
   const [isAvailable, setIsAvailable] = useState(false);
   const [isChecking, setIsChecking] = useState(true);
   const clientRef = useRef<LendasatClient | null>(null);
@@ -22,7 +25,7 @@ export function useWalletBridge() {
       }
 
       // Initialize the bridge client
-      const client = new LendasatClient(2000); // 2 second timeout for initial check
+      const client = new LendasatClient(5000); // 5 second timeout for initial check
       clientRef.current = client;
       console.log("[WalletBridge] Client initialized, checking if parent implements bridge...");
 
@@ -33,6 +36,12 @@ export function useWalletBridge() {
 
         if (address) {
           console.log("[WalletBridge] Bridge is functional, address received:", address);
+
+          // Register payment callback if provided
+          if (onPaymentReceived) {
+            client.onPaymentReceived(onPaymentReceived);
+          }
+
           setIsAvailable(true);
         } else {
           console.log("[WalletBridge] Bridge responded but no address available");
@@ -58,7 +67,7 @@ export function useWalletBridge() {
         clientRef.current = null;
       }
     };
-  }, []);
+  }, [onPaymentReceived]);
 
   return {
     isAvailable,

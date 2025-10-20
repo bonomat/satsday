@@ -36,8 +36,10 @@ export { WalletProvider, type WalletHandlers } from "./provider";
 export type {
   WalletRequest,
   WalletResponse,
+  WalletNotification,
   GetAddressRequest,
   AddressResponse,
   ErrorResponse,
+  PaymentReceivedNotification,
 } from "./types";
-export { isWalletRequest, isWalletResponse } from "./types";
+export { isWalletRequest, isWalletResponse, isWalletNotification } from "./types";

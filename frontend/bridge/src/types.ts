@@ -45,6 +45,19 @@ export interface ErrorResponse {
   error: string;
 }
 
+// Notification messages sent from parent wallet to iframe (no response expected)
+export interface PaymentReceivedNotification {
+  type: "PAYMENT_RECEIVED";
+  /** Optional address where payment was received */
+  address?: string;
+  /** Amount received in satoshis */
+  amount: number;
+  /** Transaction ID */
+  txid: string;
+}
+
+export type WalletNotification = PaymentReceivedNotification;
+
 // Type guards
 export function isWalletRequest(message: unknown): message is WalletRequest {
   if (typeof message !== "object" || message === null) {
@@ -66,4 +79,15 @@ export function isWalletResponse(message: unknown): message is WalletResponse {
     msg.type === "SEND_TO_ADDRESS_RESPONSE" ||
     msg.type === "ERROR"
   );
+}
+
+export function isWalletNotification(
+  message: unknown,
+): message is WalletNotification {
+  if (typeof message !== "object" || message === null) {
+    return false;
+  }
+
+  const msg = message as { type?: string };
+  return msg.type === "PAYMENT_RECEIVED";
 }

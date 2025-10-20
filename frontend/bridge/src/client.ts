@@ -1,5 +1,10 @@
-import type { WalletRequest, WalletResponse, ErrorResponse } from "./types";
-import { isWalletResponse } from "./types";
+import type {
+  WalletRequest,
+  WalletResponse,
+  ErrorResponse,
+  PaymentReceivedNotification,
+} from "./types";
+import { isWalletResponse, isWalletNotification } from "./types";
 
 /**
  * Client for Lendasat iframe to communicate with parent wallet
@@ -21,6 +26,9 @@ export class LendasatClient {
   >;
   private targetOrigin: string;
   private messageHandler: ((event: MessageEvent) => void) | null = null;
+  private paymentReceivedCallback:
+    | ((notification: PaymentReceivedNotification) => void)
+    | null = null;
 
   /**
    * @param targetOrigin - The origin of the parent wallet (default: "*" for development, should be specific in production)
@@ -40,6 +48,21 @@ export class LendasatClient {
       // TODO: In production, validate event.origin matches expected parent origin
       const message = event.data;
 
+      // Handle notifications (no response expected)
+      if (isWalletNotification(message)) {
+        console.log(
+          "[WalletBridge Client] Received notification:",
+          message.type,
+          message,
+        );
+
+        if (message.type === "PAYMENT_RECEIVED" && this.paymentReceivedCallback) {
+          this.paymentReceivedCallback(message);
+        }
+        return;
+      }
+
+      // Handle responses to requests
       if (!isWalletResponse(message)) {
         return;
       }
@@ -153,6 +176,17 @@ export class LendasatClient {
   }
 
   /**
+   * Register a callback to be called when a payment is received
+   * @param callback - Function to call when payment is received
+   */
+  onPaymentReceived(
+    callback: (notification: PaymentReceivedNotification) => void,
+  ): void {
+    this.paymentReceivedCallback = callback;
+    console.log("[WalletBridge Client] Payment received callback registered");
+  }
+
+  /**
    * Clean up event listeners
    */
   destroy(): void {
@@ -161,5 +195,6 @@ export class LendasatClient {
       this.messageHandler = null;
     }
     this.pendingRequests.clear();
+    this.paymentReceivedCallback = null;
   }
 }

@@ -1,4 +1,8 @@
-import type { WalletRequest, WalletResponse } from "./types";
+import type {
+  WalletRequest,
+  WalletResponse,
+  PaymentReceivedNotification,
+} from "./types";
 import { isWalletRequest } from "./types";
 
 /**
@@ -46,6 +50,7 @@ export class WalletProvider {
   private handlers: WalletHandlers;
   private messageHandler: ((event: MessageEvent) => void) | null = null;
   private allowedOrigins: string[];
+  private iframe: HTMLIFrameElement | null = null;
 
   /**
    * @param handlers - Handler functions for wallet operations
@@ -64,6 +69,11 @@ export class WalletProvider {
     if (this.messageHandler) {
       // Already listening
       return;
+    }
+
+    // Store iframe reference for notifications
+    if (iframe) {
+      this.iframe = iframe;
     }
 
     this.messageHandler = async (event: MessageEvent) => {
@@ -158,6 +168,38 @@ export class WalletProvider {
   }
 
   /**
+   * Notify the iframe that a payment has been received
+   * @param address - Optional address where payment was received
+   * @param amount - Amount received in satoshis
+   * @param txid - Transaction ID
+   */
+  notifyPaymentReceived(
+    txid: string,
+    amount: number,
+    address?: string,
+  ): void {
+    if (!this.iframe?.contentWindow) {
+      console.warn(
+        "[WalletBridge Provider] Cannot send notification: no iframe reference",
+      );
+      return;
+    }
+
+    const notification: PaymentReceivedNotification = {
+      type: "PAYMENT_RECEIVED",
+      address,
+      amount,
+      txid,
+    };
+
+    console.log(
+      "[WalletBridge Provider] Sending payment received notification:",
+      notification,
+    );
+    this.iframe.contentWindow.postMessage(notification, "*");
+  }
+
+  /**
    * Stop listening to messages and clean up
    */
   destroy(): void {
@@ -165,5 +207,6 @@ export class WalletProvider {
       window.removeEventListener("message", this.messageHandler);
       this.messageHandler = null;
     }
+    this.iframe = null;
   }
 }
