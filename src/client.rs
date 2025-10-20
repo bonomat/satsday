@@ -571,7 +571,10 @@ impl ArkClient {
         let spendable = if select_recoverable_vtxos {
             vtxo_outpoints.spendable_with_recoverable()
         } else {
-            vtxo_outpoints.spendable().to_vec()
+            let spendable = vtxo_outpoints.spendable();
+            spendable.into_iter().filter(|v|
+                                                 !v.is_recoverable()
+                ).cloned().collect::<Vec<_>>()
         };
 
         Ok((vtxo, spendable))

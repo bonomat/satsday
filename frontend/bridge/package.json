@@ -1,0 +1,54 @@
+{
+  "name": "@bonomat/satsday-wallet-bridge",
+  "version": "0.0.1",
+  "description": "Type-safe communication bridge between Satsday iframe and parent wallet applications",
+  "type": "module",
+  "main": "./dist/index.js",
+  "module": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js",
+      "require": "./dist/index.cjs"
+    }
+  },
+  "files": [
+    "dist",
+    "README.md",
+    "LICENSE"
+  ],
+  "scripts": {
+    "build": "tsup",
+    "dev": "tsup --watch",
+    "typecheck": "tsc --noEmit",
+    "prepublishOnly": "pnpm run build"
+  },
+  "keywords": [
+    "satsday",
+    "wallet",
+    "bridge",
+    "bitcoin",
+    "iframe",
+    "communication"
+  ],
+  "author": "Lendasat",
+  "license": "MIT",
+  "publishConfig": {
+    "access": "public"
+  },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/bonomat/satsday.git",
+    "directory": "packages/wallet-bridge"
+  },
+  "bugs": {
+    "url": "https://github.com/bonomat/satsday/issues"
+  },
+  "homepage": "https://github.com/satsday/satsday#readme",
+  "devDependencies": {
+    "@repo/typescript-config": "../typescript-config",
+    "tsup": "^8.0.0",
+    "typescript": "~5.9.3"
+  }
+}
