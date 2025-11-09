@@ -45,32 +45,48 @@ export default function SatoshisNumber() {
   const [isSending, setIsSending] = useState(false);
   const seenNotifications = useRef(new Set<string>());
 
-  const handlePaymentReceived = useCallback((notification: { address?: string; amount: number; txid: string; timestamp: number; createdAt: number }) => {
-    console.log("[SatoshisNumber] Payment received:", notification);
+  const handlePaymentReceived = useCallback(
+    (notification: {
+      address?: string;
+      amount: number;
+      txid: string;
+      timestamp: number;
+      createdAt: number;
+    }) => {
+      console.log("[SatoshisNumber] Payment received:", notification);
 
-    // Check if we've seen this notification before
-    const notificationKey = `${notification.address}-${notification.txid}-${notification.createdAt}`;
-    if (seenNotifications.current.has(notificationKey)) {
-      console.log("[SatoshisNumber] Notification already seen, skipping:", notificationKey);
-      return;
-    }
-
-    // Mark as seen
-    seenNotifications.current.add(notificationKey);
-
-    // Show celebration toast
-    toast.success(
-      `Payment received! ${notification.amount.toLocaleString()} sats`,
-      {
-        description: `TXID: ${notification.txid.substring(0, 12)}...`,
-        duration: 5000,
+      // Check if we've seen this notification before
+      const notificationKey = `${notification.address}-${notification.txid}-${notification.createdAt}`;
+      if (seenNotifications.current.has(notificationKey)) {
+        console.log(
+          "[SatoshisNumber] Notification already seen, skipping:",
+          notificationKey,
+        );
+        return;
       }
-    );
 
-    // You can add more animations here (e.g., confetti)
-  }, []);
+      // Mark as seen
+      seenNotifications.current.add(notificationKey);
 
-  const { isAvailable: isBridgeAvailable, isChecking: isBridgeChecking, client: bridgeClient } = useWalletBridge(handlePaymentReceived);
+      // Show celebration toast
+      toast.success(
+        `Payment received! ${notification.amount.toLocaleString()} sats`,
+        {
+          description: `TXID: ${notification.txid.substring(0, 12)}...`,
+          duration: 5000,
+        },
+      );
+
+      // You can add more animations here (e.g., confetti)
+    },
+    [],
+  );
+
+  const {
+    isAvailable: isBridgeAvailable,
+    isChecking: isBridgeChecking,
+    client: bridgeClient,
+  } = useWalletBridge(handlePaymentReceived);
 
   // Scroll to top when component mounts
   useEffect(() => {
@@ -122,17 +138,29 @@ export default function SatoshisNumber() {
     }
 
     if (maxSendAmount > 0 && amountSats > maxSendAmount) {
-      console.error("[SatoshisNumber] Amount exceeds maximum:", amountSats, "max:", maxSendAmount);
-      toast.error(`Maximum bet amount is ${maxSendAmount.toLocaleString()} sats`);
+      console.error(
+        "[SatoshisNumber] Amount exceeds maximum:",
+        amountSats,
+        "max:",
+        maxSendAmount,
+      );
+      toast.error(
+        `Maximum bet amount is ${maxSendAmount.toLocaleString()} sats`,
+      );
       return;
     }
 
     setIsSending(true);
     try {
-      console.log("[SatoshisNumber] Sending to address:", selectedAddress.address, "amount:", amountSats);
+      console.log(
+        "[SatoshisNumber] Sending to address:",
+        selectedAddress.address,
+        "amount:",
+        amountSats,
+      );
       const txid = await bridgeClient.sendToAddress(
         selectedAddress.address,
-        amountSats
+        amountSats,
       );
       console.log("[SatoshisNumber] Transaction sent! TXID:", txid);
       toast.success(`Transaction sent! TXID: ${txid.substring(0, 8)}...`);
@@ -140,7 +168,9 @@ export default function SatoshisNumber() {
       setAmount("1000"); // Reset to default
     } catch (error) {
       console.error("[SatoshisNumber] Failed to send:", error);
-      toast.error(`Failed to send: ${error instanceof Error ? error.message : "Unknown error"}`);
+      toast.error(
+        `Failed to send: ${error instanceof Error ? error.message : "Unknown error"}`,
+      );
     } finally {
       setIsSending(false);
     }
@@ -333,9 +363,10 @@ export default function SatoshisNumber() {
                   {/* Instructions */}
                   <div className="text-sm text-muted-foreground max-w-md mx-auto space-y-3">
                     <p>
-                      Send Bitcoin to the address above, which will roll the dice. If
-                      the result is {selectedAddress?.max_roll || betNumber[0]}{" "}
-                      or lower, you win{" "}
+                      Send Bitcoin to the address above, which will roll the
+                      dice. If the result is{" "}
+                      {selectedAddress?.max_roll || betNumber[0]} or lower, you
+                      win{" "}
                       {selectedAddress?.multiplier ||
                         `${betDetails.multiplier}x`}{" "}
                       your bet!
@@ -387,7 +418,8 @@ export default function SatoshisNumber() {
             <DialogDescription>
               Enter the amount you want to bet. If Satoshi's number is{" "}
               {selectedAddress?.max_roll || betNumber[0]} or lower, you win{" "}
-              {selectedAddress?.multiplier || `${betDetails.multiplier}x`} your bet!
+              {selectedAddress?.multiplier || `${betDetails.multiplier}x`} your
+              bet!
             </DialogDescription>
           </DialogHeader>
           <div className="grid gap-4 py-4">

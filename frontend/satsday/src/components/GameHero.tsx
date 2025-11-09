@@ -61,8 +61,8 @@ export default function GameHero() {
               </div>
               <h3 className="text-xl font-semibold">Arkade Settlement</h3>
               <p className="text-muted-foreground">
-                Fast and efficient settlements using Arkade layer while maintaining
-                Bitcoin security.
+                Fast and efficient settlements using Arkade layer while
+                maintaining Bitcoin security.
               </p>
             </CardContent>
           </Card>

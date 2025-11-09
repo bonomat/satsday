@@ -47,7 +47,6 @@ async fn main() -> Result<()> {
         .install_default()
         .expect("to be able to install crypto providers");
 
-
     let cli = Cli::parse();
 
     let config = Config::from_file(&cli.config)?;

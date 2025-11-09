@@ -1,14 +1,21 @@
+use crate::ArkClient;
 use anyhow::Context;
 use anyhow::Result;
-use ark_core::{send, ArkAddress};
 use ark_core::coin_select::select_vtxos;
-use ark_core::send::{build_offchain_transactions, sign_ark_transaction, sign_checkpoint_transaction, OffchainTransactions};
-use bitcoin::{psbt, secp256k1, Amount, Txid, XOnlyPublicKey};
+use ark_core::send;
+use ark_core::send::build_offchain_transactions;
+use ark_core::send::sign_ark_transaction;
+use ark_core::send::sign_checkpoint_transaction;
+use ark_core::send::OffchainTransactions;
+use ark_core::ArkAddress;
+use bitcoin::psbt;
+use bitcoin::secp256k1;
 use bitcoin::secp256k1::schnorr;
-use crate::ArkClient;
+use bitcoin::Amount;
+use bitcoin::Txid;
+use bitcoin::XOnlyPublicKey;
 
-impl ArkClient
-{
+impl ArkClient {
     /// Spend confirmed and pre-confimed VTXOs in an Ark transaction sending the given `amount` to
     /// the given `address`.
     ///
@@ -44,7 +51,7 @@ impl ArkClient
             self.server_info.dust,
             true,
         )
-            .context("failed to select coins")?;
+        .context("failed to select coins")?;
 
         let vtxo_inputs = selected_coins
             .into_iter()
@@ -88,7 +95,7 @@ impl ArkClient
             &vtxo_inputs,
             &self.server_info,
         )
-            .context("failed to build offchain transactions")?;
+        .context("failed to build offchain transactions")?;
 
         let mut all_keys = vec![self.main_address.clone()];
         for game_address in &self.game_addresses {
@@ -97,7 +104,7 @@ impl ArkClient
 
         let sign_fn = |_: &mut psbt::Input,
                        msg: secp256k1::Message|
-                       -> Result<(schnorr::Signature, XOnlyPublicKey), ark_core::Error> {
+         -> Result<(schnorr::Signature, XOnlyPublicKey), ark_core::Error> {
             /*let sig = Secp256k1::new().sign_schnorr_no_aux_rand(&msg, self.kp());
             let pk = self.kp().x_only_public_key().0;
 

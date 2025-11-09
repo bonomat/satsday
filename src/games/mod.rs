@@ -45,7 +45,6 @@ pub enum GameType {
     // CoinFlip,
 }
 
-
 impl fmt::Display for GameType {
     fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
         match self {

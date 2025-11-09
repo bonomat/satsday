@@ -8,15 +8,20 @@ use crate::key_derivation::Multiplier;
 use anyhow::bail;
 use anyhow::Context;
 use anyhow::Result;
-use ark_core::{batch, intent};
-use ark_core::batch::{create_and_sign_forfeit_txs, sign_batch_tree_tx, aggregate_nonces};
+use ark_core::batch;
+use ark_core::batch::aggregate_nonces;
+use ark_core::batch::create_and_sign_forfeit_txs;
 use ark_core::batch::generate_nonce_tree;
+use ark_core::batch::sign_batch_tree_tx;
 use ark_core::batch::sign_commitment_psbt;
 use ark_core::boarding_output::list_boarding_outpoints;
 use ark_core::boarding_output::BoardingOutpoints;
-use ark_core::server::{BatchTreeEventType, PartialSigTree, SubscriptionResponse};
+use ark_core::intent;
+use ark_core::server::BatchTreeEventType;
 use ark_core::server::GetVtxosRequest;
+use ark_core::server::PartialSigTree;
 use ark_core::server::StreamEvent;
+use ark_core::server::SubscriptionResponse;
 use ark_core::vtxo::list_virtual_tx_outpoints;
 use ark_core::vtxo::VirtualTxOutPoints;
 use ark_core::ArkAddress;
@@ -33,7 +38,7 @@ use bitcoin::secp256k1::schnorr;
 use bitcoin::secp256k1::PublicKey;
 use bitcoin::secp256k1::SecretKey;
 use bitcoin::secp256k1::{self};
-use bitcoin::{Amount};
+use bitcoin::Amount;
 use bitcoin::OutPoint;
 use bitcoin::TxOut;
 use bitcoin::Txid;
@@ -107,7 +112,6 @@ impl ArkClient {
             server_info.network,
         )?;
 
-
         // Create boarding output
         let boarding_output = BoardingOutput::new(
             &secp,
@@ -180,8 +184,10 @@ impl ArkClient {
             list_virtual_tx_outpoints(find_outpoints_fn, spendable_vtxos)?
         };
 
-        let boarding_outpoints =
-            list_boarding_outpoints(find_outpoints_fn, std::slice::from_ref(&self.boarding_output))?;
+        let boarding_outpoints = list_boarding_outpoints(
+            find_outpoints_fn,
+            std::slice::from_ref(&self.boarding_output),
+        )?;
 
         Ok(Balance {
             offchain_spendable: virtual_tx_outpoints.spendable_balance(),
@@ -213,8 +219,10 @@ impl ArkClient {
             list_virtual_tx_outpoints(find_outpoints_fn, spendable_vtxos)?
         };
 
-        let boarding_outpoints =
-            list_boarding_outpoints(find_outpoints_fn, std::slice::from_ref(&self.boarding_output))?;
+        let boarding_outpoints = list_boarding_outpoints(
+            find_outpoints_fn,
+            std::slice::from_ref(&self.boarding_output),
+        )?;
 
         self.settle_internal(virtual_tx_outpoints, boarding_outpoints)
             .await
@@ -292,9 +300,11 @@ impl ArkClient {
             vtxo_outpoints.spendable_with_recoverable()
         } else {
             let spendable = vtxo_outpoints.spendable();
-            spendable.into_iter().filter(|v|
-                                                 !v.is_recoverable()
-                ).cloned().collect::<Vec<_>>()
+            spendable
+                .into_iter()
+                .filter(|v| !v.is_recoverable())
+                .cloned()
+                .collect::<Vec<_>>()
         };
 
         Ok((vtxo, spendable))
@@ -405,10 +415,7 @@ impl ArkClient {
             own_cosigner_pks.clone(),
         )?;
 
-        let intent_id = self
-            .grpc_client
-            .register_intent(signature)
-            .await?;
+        let intent_id = self.grpc_client.register_intent(signature).await?;
 
         let topics = vtxos
             .spendable
@@ -506,9 +513,11 @@ impl ArkClient {
                     let tree_tx_nonce_pks = e.nonces;
 
                     // Check if this event is for us
-                    let cosigner_pk = match tree_tx_nonce_pks.0.iter().find(|(pk, _)| {
-                        &&cosigner_kp.public_key().x_only_public_key().0 == pk
-                    }) {
+                    let cosigner_pk = match tree_tx_nonce_pks
+                        .0
+                        .iter()
+                        .find(|(pk, _)| &&cosigner_kp.public_key().x_only_public_key().0 == pk)
+                    {
                         Some((pk, _)) => *pk,
                         None => {
                             tracing::debug!(
@@ -539,7 +548,9 @@ impl ArkClient {
                         let mut partial_sig_tree = PartialSigTree::default();
                         for (txid, _) in vtxo_graph.as_map() {
                             let agg_nonce_pk = agg_nonce_pks.get(&txid).ok_or_else(|| {
-                                anyhow::anyhow!(format!("missing aggregated nonce PK for TX {txid}"))
+                                anyhow::anyhow!(format!(
+                                    "missing aggregated nonce PK for TX {txid}"
+                                ))
                             })?;
 
                             let sigs = sign_batch_tree_tx(
@@ -557,7 +568,11 @@ impl ArkClient {
                         }
 
                         self.grpc_client
-                            .submit_tree_signatures(&round_id, cosigner_kp.public_key(), partial_sig_tree)
+                            .submit_tree_signatures(
+                                &round_id,
+                                cosigner_kp.public_key(),
+                                partial_sig_tree,
+                            )
                             .await?;
                     }
                 }
@@ -899,4 +914,3 @@ async fn get_address_from_output(
         }
     }
 }
-

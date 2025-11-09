@@ -11,8 +11,8 @@ path = "src/bin/ark-cli.rs"
 anyhow = "1"
 ark-core = { git = "https://github.com/arkade-os/rust-sdk.git", rev = "e2e2ad891595795b4655106eaea553900fdf1506" }
 ark-grpc = { git = "https://github.com/arkade-os/rust-sdk.git", rev = "e2e2ad891595795b4655106eaea553900fdf1506" }
-#ark-core = { path = "/Users/bonomat/src/github/arkade/rust-sdk/ark-core" }
-#ark-grpc = { path = "/Users/bonomat/src/github/arkade/rust-sdk/ark-grpc" }
+# ark-core = { path = "/Users/bonomat/src/github/arkade/rust-sdk/ark-core" }
+# ark-grpc = { path = "/Users/bonomat/src/github/arkade/rust-sdk/ark-grpc" }
 async-stream = "0.3"
 atty = "0.2.14"
 axum = { version = "0.8", features = ["ws"] }

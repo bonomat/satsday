@@ -1,5 +1,8 @@
 import { useState, useEffect, useRef } from "react";
-import { LendasatClient, type PaymentReceivedNotification } from "@bonomat/satsday-wallet-bridge";
+import {
+  LendasatClient,
+  type PaymentReceivedNotification,
+} from "@bonomat/satsday-wallet-bridge";
 
 /**
  * Hook to detect if app is running in an iframe with a functional wallet bridge
@@ -7,7 +10,7 @@ import { LendasatClient, type PaymentReceivedNotification } from "@bonomat/satsd
  * @returns Object containing bridge client and availability status
  */
 export function useWalletBridge(
-  onPaymentReceived?: (notification: PaymentReceivedNotification) => void
+  onPaymentReceived?: (notification: PaymentReceivedNotification) => void,
 ) {
   const [isAvailable, setIsAvailable] = useState(false);
   const [isChecking, setIsChecking] = useState(true);
@@ -27,7 +30,9 @@ export function useWalletBridge(
       // Initialize the bridge client
       const client = new LendasatClient(5000); // 5 second timeout for initial check
       clientRef.current = client;
-      console.log("[WalletBridge] Client initialized, checking if parent implements bridge...");
+      console.log(
+        "[WalletBridge] Client initialized, checking if parent implements bridge...",
+      );
 
       try {
         // Try to get an address to verify the bridge is functional
@@ -35,7 +40,10 @@ export function useWalletBridge(
         const address = await client.getAddress();
 
         if (address) {
-          console.log("[WalletBridge] Bridge is functional, address received:", address);
+          console.log(
+            "[WalletBridge] Bridge is functional, address received:",
+            address,
+          );
 
           // Register payment callback if provided
           if (onPaymentReceived) {
@@ -44,11 +52,16 @@ export function useWalletBridge(
 
           setIsAvailable(true);
         } else {
-          console.log("[WalletBridge] Bridge responded but no address available");
+          console.log(
+            "[WalletBridge] Bridge responded but no address available",
+          );
           setIsAvailable(false);
         }
       } catch (error) {
-        console.log("[WalletBridge] Bridge not available or not implemented by parent:", error);
+        console.log(
+          "[WalletBridge] Bridge not available or not implemented by parent:",
+          error,
+        );
         setIsAvailable(false);
         // Clean up the client if bridge is not available
         client.destroy();
