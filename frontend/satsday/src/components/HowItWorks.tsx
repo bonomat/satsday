@@ -6,9 +6,9 @@ export default function HowItWorksContent() {
   const steps = [
     {
       icon: Bitcoin,
-      title: "Ark Transaction",
+      title: "Arkade Transaction",
       description:
-        "Your Ark transaction hash is selected as the randomness source.",
+        "Your Arkade transaction hash is selected as the randomness source.",
       detail:
         "We use the transaction hash you sent to us to ensure true randomness that cannot be manipulated.",
     },
@@ -42,7 +42,7 @@ export default function HowItWorksContent() {
       <div className="text-center space-y-4">
         <h2 className="text-3xl font-bold">How Provably Fair Works</h2>
         <p className="text-muted-foreground max-w-2xl mx-auto">
-          Our system uses Ark transaction hashes to generate truly random and
+          Our system uses Arkade transaction hashes to generate truly random and
           verifiable dice results. Here's how we guarantee fairness in every
           roll.
         </p>

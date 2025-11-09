@@ -54,6 +54,10 @@ export interface PaymentReceivedNotification {
   amount: number;
   /** Transaction ID */
   txid: string;
+  /** Timestamp when the payment was created (Unix timestamp in milliseconds) */
+  timestamp: number;
+  /** Unix timestamp when the payment was created (milliseconds) */
+  createdAt: number;
 }
 
 export type WalletNotification = PaymentReceivedNotification;

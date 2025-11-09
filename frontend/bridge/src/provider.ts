@@ -169,13 +169,15 @@ export class WalletProvider {
 
   /**
    * Notify the iframe that a payment has been received
-   * @param address - Optional address where payment was received
-   * @param amount - Amount received in satoshis
    * @param txid - Transaction ID
+   * @param amount - Amount received in satoshis
+   * @param timestamp - Timestamp when payment was created (Unix timestamp in milliseconds)
+   * @param address - Optional address where payment was received
    */
   notifyPaymentReceived(
     txid: string,
     amount: number,
+    timestamp: number,
     address?: string,
   ): void {
     if (!this.iframe?.contentWindow) {
@@ -190,6 +192,8 @@ export class WalletProvider {
       address,
       amount,
       txid,
+      timestamp,
+      createdAt: timestamp,
     };
 
     console.log(

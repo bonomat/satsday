@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useRef } from "react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Slider } from "@/components/ui/slider";
@@ -43,9 +43,20 @@ export default function SatoshisNumber() {
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [amount, setAmount] = useState("1000");
   const [isSending, setIsSending] = useState(false);
+  const seenNotifications = useRef(new Set<string>());
 
-  const handlePaymentReceived = useCallback((notification: { address?: string; amount: number; txid: string }) => {
+  const handlePaymentReceived = useCallback((notification: { address?: string; amount: number; txid: string; timestamp: number; createdAt: number }) => {
     console.log("[SatoshisNumber] Payment received:", notification);
+
+    // Check if we've seen this notification before
+    const notificationKey = `${notification.address}-${notification.txid}-${notification.createdAt}`;
+    if (seenNotifications.current.has(notificationKey)) {
+      console.log("[SatoshisNumber] Notification already seen, skipping:", notificationKey);
+      return;
+    }
+
+    // Mark as seen
+    seenNotifications.current.add(notificationKey);
 
     // Show celebration toast
     toast.success(
@@ -322,7 +333,7 @@ export default function SatoshisNumber() {
                   {/* Instructions */}
                   <div className="text-sm text-muted-foreground max-w-md mx-auto space-y-3">
                     <p>
-                      Send Bitcoin to the address above, then roll the dice. If
+                      Send Bitcoin to the address above, which will roll the dice. If
                       the result is {selectedAddress?.max_roll || betNumber[0]}{" "}
                       or lower, you win{" "}
                       {selectedAddress?.multiplier ||

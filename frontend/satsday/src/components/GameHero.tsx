@@ -19,7 +19,7 @@ export default function GameHero() {
           </h1>
 
           <p className="text-xl md:text-2xl text-muted-foreground max-w-3xl mx-auto leading-relaxed">
-            Experience transparent gaming powered by Ark. Every outcome is
+            Experience transparent gaming powered by Arkade. Every outcome is
             verifiable. Every game is provably fair. Every day is Satsday.
           </p>
 
@@ -59,9 +59,9 @@ export default function GameHero() {
               <div className="w-12 h-12 bg-primary/10 rounded-lg flex items-center justify-center mx-auto">
                 <Bitcoin className="w-6 h-6 text-primary" />
               </div>
-              <h3 className="text-xl font-semibold">Ark Settlement</h3>
+              <h3 className="text-xl font-semibold">Arkade Settlement</h3>
               <p className="text-muted-foreground">
-                Fast and efficient settlements using Ark layer while maintaining
+                Fast and efficient settlements using Arkade layer while maintaining
                 Bitcoin security.
               </p>
             </CardContent>

@@ -37,8 +37,7 @@ const Terms = () => {
               2. How the Game Works
             </h2>
             <p className="text-muted-foreground mb-4">
-              SatsDay is a provably fair dice game built on the Bitcoin
-              Lightning Network using Ark protocol:
+              SatsDay is a provably fair dice game built on Arkade:
             </p>
             <ul className="list-disc pl-6 space-y-2 text-muted-foreground">
               <li>Players send Bitcoin to one of our game addresses</li>
