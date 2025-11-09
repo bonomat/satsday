@@ -1,5 +1,6 @@
 use anyhow::Result;
 use clap::Parser;
+use rand::thread_rng;
 use satoshi_dice::db;
 use satoshi_dice::logger;
 use satoshi_dice::ArkClient;
@@ -117,14 +118,17 @@ async fn main() -> Result<()> {
             tracing::info!("Sent {} to {} in transaction {}", amount, address, txid);
             db::insert_own_transaction(&pool, txid.to_string().as_str(), "manual_send").await?;
         }
-        Commands::Settle => match client.settle().await? {
-            Some(txid) => {
-                tracing::info!("Settlement completed. Round TXID: {}", txid);
-                db::insert_own_transaction(&pool, txid.to_string().as_str(), "consolidation")
-                    .await?;
+        Commands::Settle => {
+            let mut rng = thread_rng();
+            match client.settle(&mut rng, true).await? {
+                Some(txid) => {
+                    tracing::info!("Settlement completed. Round TXID: {}", txid);
+                    db::insert_own_transaction(&pool, txid.to_string().as_str(), "consolidation")
+                        .await?;
+                }
+                None => tracing::info!("No boarding outputs or VTXOs to settle"),
             }
-            None => tracing::info!("No boarding outputs or VTXOs to settle"),
-        },
+        }
         Commands::Stats => {
             let game_addresses = client.get_game_addresses();
             let game_addresses = game_addresses

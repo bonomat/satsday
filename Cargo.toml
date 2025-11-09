@@ -16,6 +16,7 @@ ark-grpc = { git = "https://github.com/arkade-os/rust-sdk.git", rev = "e2e2ad891
 async-stream = "0.3"
 atty = "0.2.14"
 axum = { version = "0.8", features = ["ws"] }
+backon = { version = "1", features = ["tokio-sleep"] }
 bitcoin = { version = "0.32.4", features = ["rand", "serde"] }
 clap = { version = "4", features = ["derive"] }
 esplora-client = { version = "0.10.0", features = ["async-https", "blocking-https"] }
