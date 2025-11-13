@@ -418,40 +418,18 @@ impl ArkClient {
             while let Some(result) = subscription_stream.next().await {
                 match result {
                     Ok(SubscriptionResponse::Event(response)) => {
-                        // Get the transaction details
-                        let psbt = if let Some(psbt) = response.tx {
-                            psbt
-                        } else {
-                            match self.grpc_client
-                                .get_virtual_txs(vec![response.txid.to_string()], None)
-                                .await {
-                                Ok(fetched) => {
-                                    if let Some(tx) = fetched.txs.into_iter().next() {
-                                        tx
-                                    } else {
-                                        tracing::warn!("No transactions found for txid: {}", response.txid);
-                                        continue;
-                                    }
-                                }
-                                Err(e) => {
-                                    tracing::error!("Failed to fetch transaction: {}", e);
-                                    continue;
-                                }
-                            }
-                        };
+                        
+                        let new_vtxos = response.new_vtxos;
 
-                        let tx = &psbt.unsigned_tx;
-                        let txid = tx.compute_txid();
-
-                        // Check each output to see if it matches one of our game addresses
-                        for (vout, output) in tx.output.iter().enumerate() {
+                        for new_vtxo in new_vtxos {
                             for (_, _, address) in &game_addresses {
-                                if output.script_pubkey == address.to_p2tr_script_pubkey() {
+                                if new_vtxo.clone().script == address.to_sub_dust_script_pubkey() ||
+                                new_vtxo.clone().script == address.to_p2tr_script_pubkey(){
                                     yield Ok(SubscriptionEvent {
-                                        txid,
-                                        vout: vout as u32,
-                                        amount: Amount::from_sat(output.value.to_sat()),
-                                        script_pubkey: output.script_pubkey.clone(),
+                                        txid: new_vtxo.outpoint.txid,
+                                        vout: new_vtxo.outpoint.vout,
+                                        amount: new_vtxo.amount,
+                                        script_pubkey: new_vtxo.script.clone(),
                                     });
                                 }
                             }

@@ -39,6 +39,7 @@ pub struct TransactionProcessor {
     db_pool: Pool<Sqlite>,
     broadcaster: SharedBroadcaster,
     max_payout_sats: u64,
+    dust_amount: Amount,
 }
 
 impl TransactionProcessor {
@@ -49,6 +50,7 @@ impl TransactionProcessor {
         db_pool: Pool<Sqlite>,
         broadcaster: SharedBroadcaster,
         max_payout_sats: u64,
+        dust_amount: Amount,
     ) -> Self {
         Self {
             ark_client,
@@ -57,6 +59,7 @@ impl TransactionProcessor {
             db_pool,
             broadcaster,
             max_payout_sats,
+            dust_amount
         }
     }
 
@@ -138,8 +141,7 @@ impl TransactionProcessor {
 
     async fn process_single_event(&self, event: SubscriptionEvent) -> Result<()> {
         let tx_id = event.txid.to_string();
-
-        tracing::debug!(tx_id, "📨 Received subscription event for tx",);
+        tracing::info!(tx_id, ?event, "📨 Received subscription event for tx",);
 
         // Check if this is our own transaction
         let is_own_tx = db::is_own_transaction(&self.db_pool, &tx_id).await;
@@ -151,7 +153,7 @@ impl TransactionProcessor {
 
                 // Find which game address this transaction is for
                 if let Some((game_type, multiplier)) =
-                    self.find_game_for_script(&event.script_pubkey)
+                    self.find_game_for_script(&event.script_pubkey, event.amount)
                 {
                     if let Some(game_result) =
                         self.evaluate_game(game_type, &multiplier, &event).await?
@@ -199,10 +201,17 @@ impl TransactionProcessor {
     fn find_game_for_script(
         &self,
         script_pubkey: &bitcoin::ScriptBuf,
+        amount: Amount,
     ) -> Option<(GameType, Multiplier)> {
         let game_addresses = self.ark_client.get_game_addresses();
 
         for (game_type, multiplier, address) in game_addresses {
+            if amount <= self.dust_amount {
+                if address.to_sub_dust_script_pubkey() == *script_pubkey {
+                    return Some((game_type, multiplier));
+                }
+            }
+
             if address.to_p2tr_script_pubkey() == *script_pubkey {
                 return Some((game_type, multiplier));
             }
@@ -533,6 +542,7 @@ pub async fn spawn_transaction_monitor(
     db_pool: Pool<Sqlite>,
     broadcaster: SharedBroadcaster,
     max_payout_sats: u64,
+    dust_amount: Amount,
 ) {
     let processor = TransactionProcessor::new(
         ark_client,
@@ -541,6 +551,7 @@ pub async fn spawn_transaction_monitor(
         db_pool,
         broadcaster,
         max_payout_sats,
+        dust_amount
     );
 
     tokio::spawn(async move {

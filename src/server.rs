@@ -144,6 +144,8 @@ pub async fn start_server(
         config: config.clone(),
     };
 
+    let dust_amount = ark_client_arc.dust_value();
+
     // Start transaction monitoring in background
     spawn_transaction_monitor(
         ark_client_arc,
@@ -152,6 +154,7 @@ pub async fn start_server(
         pool,
         broadcaster,
         config.max_payout_sats,
+        dust_amount
     )
     .await;
     tracing::info!("🔍 Transaction monitoring started with subscriptions");
