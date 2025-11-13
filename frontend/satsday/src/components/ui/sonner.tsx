@@ -1,25 +1,24 @@
-import { useTheme } from "next-themes";
 import { Toaster as Sonner, toast } from "sonner";
 
 type ToasterProps = React.ComponentProps<typeof Sonner>;
 
 const Toaster = ({ ...props }: ToasterProps) => {
-  const { theme = "system" } = useTheme();
-
   return (
     <Sonner
-      theme={theme as ToasterProps["theme"]}
+      theme="dark"
       className="toaster group"
-      position="top-right"
+      position="top-center"
       toastOptions={{
         classNames: {
           toast:
-            "group toast group-[.toaster]:bg-background group-[.toaster]:text-foreground group-[.toaster]:border-border group-[.toaster]:shadow-lg",
-          description: "group-[.toast]:text-muted-foreground",
+            "group toast group-[.toaster]:bg-white group-[.toaster]:text-gray-900 group-[.toaster]:border-2 group-[.toaster]:border-orange-400 group-[.toaster]:shadow-2xl",
+          description: "group-[.toast]:text-gray-700 group-[.toast]:font-medium",
           actionButton:
-            "group-[.toast]:bg-primary group-[.toast]:text-primary-foreground",
+            "group-[.toast]:bg-orange-500 group-[.toast]:text-white group-[.toast]:font-bold",
           cancelButton:
-            "group-[.toast]:bg-muted group-[.toast]:text-muted-foreground",
+            "group-[.toast]:bg-gray-200 group-[.toast]:text-gray-800",
+          success: "group-[.toast]:bg-green-500 group-[.toast]:text-white group-[.toast]:border-green-400 group-[.toast]:font-bold",
+          error: "group-[.toast]:bg-red-500 group-[.toast]:text-white group-[.toast]:border-red-400 group-[.toast]:font-bold",
         },
       }}
       {...props}

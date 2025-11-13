@@ -41,6 +41,12 @@ const ActivityFeed = () => {
       if (game.is_win) {
         toast.success("Winning Game!", {
           description: `Someone won ${game.payout} sats with ${game.multiplier}x multiplier`,
+          duration: 5000
+        });
+      } else {
+        toast.success("Losing Game!", {
+          description: `Someone tried didn't find his luck with ${game.multiplier}x multiplier`,
+          duration: 5000
         });
       }
     },
@@ -48,6 +54,7 @@ const ActivityFeed = () => {
       // Optionally show toast for donations too
       toast.success("New Donation!", {
         description: `${donation.amount} sats from ${donation.sender.slice(0, 10)}...`,
+        duration: 5000
       });
     },
   });
