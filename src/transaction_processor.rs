@@ -400,6 +400,11 @@ impl TransactionProcessor {
                     // Process winner result
                     self.process_winner_result(winner, Some(txid.to_string()))
                         .await?;
+
+                    if let Err(err) = self.ark_client.sync_spendable_vtxos().await {
+                        tracing::error!("Failed syncing after sending {err:#}");
+                    }
+
                     break;
                 }
                 Err(e) => {

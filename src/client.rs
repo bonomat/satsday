@@ -25,6 +25,8 @@ use bitcoin::OutPoint;
 use bitcoin::Txid;
 use bitcoin::XOnlyPublicKey;
 use std::collections::HashMap;
+use std::sync::Arc;
+use tokio::sync::RwLock;
 use tokio::task::block_in_place;
 
 pub struct ArkClient {
@@ -35,6 +37,8 @@ pub struct ArkClient {
     boarding_output: BoardingOutput,
     secp: Secp256k1<secp256k1::All>,
     game_addresses: Vec<GameArkAddress>,
+    /// Cached spendable VTXOs, updated periodically
+    cached_spendable_vtxos: Arc<RwLock<HashMap<Vtxo, Vec<ark_core::server::VirtualTxOutPoint>>>>,
 }
 
 #[derive(Debug)]
@@ -131,6 +135,7 @@ impl ArkClient {
             game_addresses,
             boarding_output,
             secp,
+            cached_spendable_vtxos: Arc::new(RwLock::new(HashMap::new())),
         })
     }
 
@@ -175,6 +180,40 @@ impl ArkClient {
             boarding_expired: boarding_outpoints.expired_balance(),
             boarding_pending: boarding_outpoints.pending_balance(),
         })
+    }
+
+    /// Sync spendable VTXOs and update the cache
+    pub async fn sync_spendable_vtxos(&self) -> Result<()> {
+        let select_recoverable_vtxos = false;
+        let mut spendable_vtxos = HashMap::new();
+
+        let main = self
+            ._spendable_vtxos(self.main_address.0.clone(), select_recoverable_vtxos)
+            .await?;
+        spendable_vtxos.insert(main.0, main.1);
+
+        for game_address in &self.game_addresses {
+            let spendable = self
+                ._spendable_vtxos(game_address.vtxo.clone(), select_recoverable_vtxos)
+                .await?;
+            spendable_vtxos.insert(spendable.0, spendable.1);
+        }
+
+        // Update the cache
+        let mut cache = self.cached_spendable_vtxos.write().await;
+        *cache = spendable_vtxos;
+
+        tracing::debug!("✅ Synced spendable VTXOs cache");
+
+        Ok(())
+    }
+
+    /// Get cached spendable VTXOs
+    pub async fn get_cached_spendable_vtxos(
+        &self,
+    ) -> Result<HashMap<Vtxo, Vec<ark_core::server::VirtualTxOutPoint>>> {
+        let cache = self.cached_spendable_vtxos.read().await;
+        Ok(cache.clone())
     }
 
     pub async fn spendable_vtxos(
@@ -322,6 +361,45 @@ impl ArkClient {
 
     pub fn dust_value(&self) -> Amount {
         self.server_info.dust
+    }
+
+    /// Spawn a background task that periodically syncs spendable VTXOs
+    pub fn spawn_vtxo_sync_task(
+        self: Arc<Self>,
+        sync_interval_seconds: u64,
+    ) -> tokio::task::JoinHandle<()> {
+        tokio::spawn(async move {
+            // Do an initial sync before starting the interval
+            match self.sync_spendable_vtxos().await {
+                Ok(()) => {
+                    tracing::info!("✅ Initial VTXO cache sync completed");
+                }
+                Err(e) => {
+                    tracing::error!("Initial VTXO cache sync failed: {}", e);
+                }
+            }
+
+            let mut interval = tokio::time::interval(tokio::time::Duration::from_secs(sync_interval_seconds));
+            interval.set_missed_tick_behavior(tokio::time::MissedTickBehavior::Skip);
+
+            tracing::info!(
+                interval_seconds = sync_interval_seconds,
+                "🔄 Starting VTXO sync background task"
+            );
+
+            loop {
+                interval.tick().await;
+
+                match self.sync_spendable_vtxos().await {
+                    Ok(()) => {
+                        tracing::trace!("Background VTXO sync completed successfully");
+                    }
+                    Err(e) => {
+                        tracing::error!("Background VTXO sync failed: {}", e);
+                    }
+                }
+            }
+        })
     }
 
     /// Find the game type and multiplier for a given address

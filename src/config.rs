@@ -10,6 +10,8 @@ pub struct Config {
     pub transaction_check_interval_seconds: u64,
     #[serde(default = "default_max_payout_sats")]
     pub max_payout_sats: u64,
+    #[serde(default = "default_vtxo_sync_interval")]
+    pub vtxo_sync_interval_seconds: u64,
 }
 
 fn default_transaction_check_interval() -> u64 {
@@ -18,6 +20,10 @@ fn default_transaction_check_interval() -> u64 {
 
 fn default_max_payout_sats() -> u64 {
     100_000
+}
+
+fn default_vtxo_sync_interval() -> u64 {
+    300 // 5 minutes
 }
 
 impl Config {

@@ -148,7 +148,7 @@ pub async fn start_server(
 
     // Start transaction monitoring in background
     spawn_transaction_monitor(
-        ark_client_arc,
+        ark_client_arc.clone(),
         my_addresses,
         nonce_service,
         pool,
@@ -158,6 +158,13 @@ pub async fn start_server(
     )
     .await;
     tracing::info!("🔍 Transaction monitoring started with subscriptions");
+
+    // Start VTXO sync background task
+    let _vtxo_sync_handle = ark_client_arc.clone().spawn_vtxo_sync_task(config.vtxo_sync_interval_seconds);
+    tracing::info!(
+        interval_seconds = config.vtxo_sync_interval_seconds,
+        "🔄 VTXO sync background task started"
+    );
 
     let cors = CorsLayer::new()
         .allow_credentials(true)

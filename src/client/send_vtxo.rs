@@ -26,13 +26,11 @@ impl ArkClient {
     ///
     /// The [`Txid`] of the generated Ark transaction.
     pub async fn send_vtxo(&self, address: ArkAddress, amount: Amount) -> Result<Txid> {
-        // Recoverable VTXOs cannot be sent.
-        let select_recoverable_vtxos = false;
-
+        // Use cached spendable VTXOs instead of fetching
         let spendable_vtxos = self
-            .spendable_vtxos(select_recoverable_vtxos)
+            .get_cached_spendable_vtxos()
             .await
-            .context("failed to get spendable VTXOs")?;
+            .context("failed to get cached spendable VTXOs")?;
 
         // Run coin selection algorithm on candidate spendable VTXOs.
         let spendable_virtual_tx_outpoints = spendable_vtxos
