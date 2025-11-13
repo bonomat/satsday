@@ -11,7 +11,6 @@ use ark_core::batch::generate_nonce_tree;
 use ark_core::batch::sign_batch_tree_tx;
 use ark_core::batch::sign_commitment_psbt;
 use ark_core::batch::NonceKps;
-use ark_core::boarding_output::list_boarding_outpoints;
 use ark_core::intent;
 use ark_core::server::BatchTreeEventType;
 use ark_core::server::PartialSigTree;
@@ -37,7 +36,6 @@ use rand::CryptoRng;
 use rand::Rng;
 use std::collections::HashMap;
 use time::OffsetDateTime;
-use tokio::task::block_in_place;
 use tokio::time::sleep;
 
 enum BatchOutputType {
@@ -623,16 +621,12 @@ impl ArkClient {
                         } else {
                             let mut commitment_psbt = e.commitment_tx;
 
-                            let sign_for_pk_fn = |pk: &XOnlyPublicKey,
+                            let sign_for_pk_fn = |_pk: &XOnlyPublicKey,
                                                   msg: &secp256k1::Message|
                              -> Result<
                                 schnorr::Signature,
                                 ark_core::Error,
                             > {
-                                // self.inner
-                                //     .wallet
-                                //     .sign_for_pk(pk, msg)
-                                //     .map_err(|e| ark_core::Error::ad_hoc(e.to_string()))
                                 Ok(self.secp.sign_schnorr_no_aux_rand(msg, &main_signing_kp))
                             };
 
@@ -709,22 +703,6 @@ impl ArkClient {
         select_recoverable_vtxos: bool,
     ) -> Result<(Vec<batch::OnChainInput>, Vec<batch::VtxoInput>, Amount), Error> {
         // Get all known boarding outputs.
-        // let boarding_outputs = self.inner.wallet.get_boarding_outputs()?;
-        let runtime = tokio::runtime::Handle::current();
-        let find_outpoints_fn =
-            |address: &bitcoin::Address| -> Result<Vec<ark_core::ExplorerUtxo>, ark_core::Error> {
-                block_in_place(|| {
-                    runtime.block_on(async {
-                        let outpoints = self
-                            .esplora_client
-                            .find_outpoints(address)
-                            .await
-                            .map_err(ark_core::Error::ad_hoc)?;
-                        Ok(outpoints)
-                    })
-                })
-            };
-
         let boarding_outputs = &self.boarding_output;
 
         let mut boarding_inputs: Vec<batch::OnChainInput> = Vec::new();
@@ -737,12 +715,6 @@ impl ArkClient {
 
         // Find outpoints for each boarding output.
         for boarding_output in [boarding_outputs] {
-            // let outpoints = timeout_op(
-            //     self.inner.timeout,
-            //     self.blockchain().find_outpoints(boarding_output.address()),
-            // )
-            //     .await
-            //     .context("failed to find outpoints")??;
             let outpoints = self
                 .esplora_client
                 .find_outpoints(boarding_output.address())
