@@ -126,6 +126,15 @@ pub async fn start_server(
     config: Config,
 ) -> Result<()> {
     let ark_client_arc = Arc::new(ark_client);
+    start_server_with_arc(ark_client_arc, port, pool, config).await
+}
+
+pub async fn start_server_with_arc(
+    ark_client_arc: Arc<ArkClient>,
+    port: u16,
+    pool: Pool<Sqlite>,
+    config: Config,
+) -> Result<()> {
 
     // Get our addresses for transaction monitoring
     let my_addresses = vec![ark_client_arc.get_address()];

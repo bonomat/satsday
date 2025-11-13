@@ -217,3 +217,41 @@ pub async fn get_total_game_count(pool: &Pool<Sqlite>) -> Result<i64, sqlx::Erro
 
     Ok(result.count)
 }
+
+pub async fn get_unpaid_winners(pool: &Pool<Sqlite>) -> Result<Vec<GameResult>, sqlx::Error> {
+    let results = sqlx::query_as!(
+        GameResult,
+        r#"
+        SELECT id, nonce, rolled_number, input_tx_id, output_tx_id,
+               bet_amount, winning_amount, player_address, is_winner,
+               payment_successful, timestamp, multiplier
+        FROM game_results
+        WHERE is_winner = TRUE AND payment_successful = FALSE
+        ORDER BY timestamp ASC
+        "#
+    )
+    .fetch_all(pool)
+    .await?;
+
+    Ok(results)
+}
+
+pub async fn mark_payment_successful(
+    pool: &Pool<Sqlite>,
+    game_id: i64,
+    output_tx_id: &str,
+) -> Result<(), sqlx::Error> {
+    sqlx::query!(
+        r#"
+        UPDATE game_results
+        SET payment_successful = TRUE, output_tx_id = ?
+        WHERE id = ?
+        "#,
+        output_tx_id,
+        game_id
+    )
+    .execute(pool)
+    .await?;
+
+    Ok(())
+}

@@ -38,6 +38,7 @@ enum Commands {
         amount: u64,
     },
     Settle,
+    CatchupMissedGames,
 }
 
 #[tokio::main]
@@ -151,6 +152,31 @@ async fn main() -> Result<()> {
                     "👾Game Address {game}-{multiplier}",
 
                 );
+            }
+        }
+        Commands::CatchupMissedGames => {
+            tracing::info!("🔍 Starting missed games catchup process...");
+
+            // Create nonce service
+            let nonce_service = satoshi_dice::nonce_service::spawn_nonce_service(pool.clone(), 1, 1).await;
+
+            // Run the missed games recovery
+            let client_arc = std::sync::Arc::new(client);
+            match satoshi_dice::recovery::process_missed_games(
+                client_arc,
+                &pool,
+                &nonce_service,
+                config.max_payout_sats,
+            )
+            .await
+            {
+                Ok(()) => {
+                    tracing::info!("✅ Missed games catchup completed successfully");
+                }
+                Err(e) => {
+                    tracing::error!("❌ Missed games catchup failed: {:#}", e);
+                    return Err(e);
+                }
             }
         }
     }
