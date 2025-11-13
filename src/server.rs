@@ -505,16 +505,16 @@ async fn handle_websocket(socket: axum::extract::ws::WebSocket, state: AppState)
         _ = &mut receiver_handle => {
             tracing::debug!("WebSocket receiver task completed, aborting sender");
             sender_handle.abort();
+            // Only await the aborted handle
+            let _ = sender_handle.await;
         }
         _ = &mut sender_handle => {
             tracing::debug!("WebSocket sender task completed, aborting receiver");
             receiver_handle.abort();
+            // Only await the aborted handle
+            let _ = receiver_handle.await;
         }
     }
-
-    // Ensure both tasks are cleaned up
-    let _ = receiver_handle.await;
-    let _ = sender_handle.await;
 
     tracing::info!("WebSocket connection fully closed and cleaned up");
 }
