@@ -2,7 +2,7 @@ import { useState, useEffect, useCallback, useRef } from "react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Slider } from "@/components/ui/slider";
-import { Copy, Loader2, Shield, Dices } from "lucide-react";
+import { Copy, Loader2, Shield, Dices, Check } from "lucide-react";
 import { toast } from "sonner";
 import { Link } from "react-router-dom";
 import Navbar from "@/components/Navbar";
@@ -43,6 +43,7 @@ export default function SatoshisNumber() {
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [amount, setAmount] = useState("1000");
   const [isSending, setIsSending] = useState(false);
+  const [isCopied, setIsCopied] = useState(false);
   const seenNotifications = useRef(new Set<string>());
 
   const handlePaymentReceived = useCallback(
@@ -116,7 +117,8 @@ export default function SatoshisNumber() {
     try {
       await navigator.clipboard.writeText(text);
       console.log("[SatoshisNumber] Address copied to clipboard:", text);
-      toast.success("Address copied to clipboard!");
+      setIsCopied(true);
+      setTimeout(() => setIsCopied(false), 1000);
     } catch (error) {
       console.error("[SatoshisNumber] Failed to copy address:", error);
       toast.error("Failed to copy address");
@@ -342,7 +344,11 @@ export default function SatoshisNumber() {
                       }
                       className="h-8 w-8 p-0"
                     >
-                      <Copy className="w-4 h-4" />
+                      {isCopied ? (
+                        <Check className="w-4 h-4 text-green-500" />
+                      ) : (
+                        <Copy className="w-4 h-4" />
+                      )}
                     </Button>
                   </div>
 
