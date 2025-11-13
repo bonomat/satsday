@@ -8,6 +8,7 @@ pub mod logger;
 pub mod nonce_service;
 pub mod recovery;
 pub mod server;
+pub mod telegram;
 pub mod transaction_processor;
 pub mod websocket;
 

@@ -32,4 +32,9 @@ impl Config {
         let config: Config = toml::from_str(&content)?;
         Ok(config)
     }
+
+    /// Get telegram bot token from environment variable
+    pub fn telegram_bot_token() -> Option<String> {
+        std::env::var("TELEGRAM_BOT_KEY").ok()
+    }
 }

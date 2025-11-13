@@ -40,6 +40,7 @@ pub struct TransactionProcessor {
     broadcaster: SharedBroadcaster,
     max_payout_sats: u64,
     dust_amount: Amount,
+    telegram_bot_token: Option<String>,
 }
 
 impl TransactionProcessor {
@@ -51,6 +52,7 @@ impl TransactionProcessor {
         broadcaster: SharedBroadcaster,
         max_payout_sats: u64,
         dust_amount: Amount,
+        telegram_bot_token: Option<String>,
     ) -> Self {
         Self {
             ark_client,
@@ -59,7 +61,8 @@ impl TransactionProcessor {
             db_pool,
             broadcaster,
             max_payout_sats,
-            dust_amount
+            dust_amount,
+            telegram_bot_token,
         }
     }
 
@@ -327,6 +330,19 @@ impl TransactionProcessor {
             "💝 Processing donation"
         );
 
+        // Send Telegram notification for donation
+        if let Some(ref token) = self.telegram_bot_token {
+            if let Err(e) = crate::telegram::notify_donation(
+                &self.db_pool,
+                token,
+                &donation.sender,
+                donation.input_amount,
+                &donation.outpoint.txid.to_string(),
+            ).await {
+                tracing::error!("Failed to send telegram notification: {:#}", e);
+            }
+        }
+
         // Store as donation in database
         if let Err(e) = db::insert_game_result(
             &self.db_pool,
@@ -480,7 +496,27 @@ impl TransactionProcessor {
                 timestamp: time::OffsetDateTime::now_utc(),
             };
 
-            self.broadcast_game_result(game_item).await;
+            self.broadcast_game_result(game_item.clone()).await;
+
+            // Send Telegram notification for winner
+            if let Some(ref token) = self.telegram_bot_token {
+                if let Some(ref payout_tx) = game_item.output_tx_id {
+                    if let Err(e) = crate::telegram::notify_win(
+                        &self.db_pool,
+                        token,
+                        &winner.sender,
+                        winner.input_amount,
+                        winner.payout_amount.unwrap_or(0),
+                        winner.multiplier.multiplier() as f64 / 100.0,
+                        winner.rolled_number,
+                        winner.multiplier.get_lower_than(),
+                        &winner.outpoint.txid.to_string(),
+                        payout_tx,
+                    ).await {
+                        tracing::error!("Failed to send telegram notification: {:#}", e);
+                    }
+                }
+            }
         }
 
         Ok(())
@@ -533,7 +569,23 @@ impl TransactionProcessor {
                 timestamp: time::OffsetDateTime::now_utc(),
             };
 
-            self.broadcast_game_result(game_item).await;
+            self.broadcast_game_result(game_item.clone()).await;
+
+            // Send Telegram notification for loser
+            if let Some(ref token) = self.telegram_bot_token {
+                if let Err(e) = crate::telegram::notify_loss(
+                    &self.db_pool,
+                    token,
+                    &loser.sender,
+                    loser.input_amount,
+                    loser.multiplier.multiplier() as f64 / 100.0,
+                    loser.rolled_number,
+                    loser.multiplier.get_lower_than(),
+                    &loser.outpoint.txid.to_string(),
+                ).await {
+                    tracing::error!("Failed to send telegram notification: {:#}", e);
+                }
+            }
         }
 
         Ok(())
@@ -548,6 +600,7 @@ pub async fn spawn_transaction_monitor(
     broadcaster: SharedBroadcaster,
     max_payout_sats: u64,
     dust_amount: Amount,
+    telegram_bot_token: Option<String>,
 ) {
     let processor = TransactionProcessor::new(
         ark_client,
@@ -556,7 +609,8 @@ pub async fn spawn_transaction_monitor(
         db_pool,
         broadcaster,
         max_payout_sats,
-        dust_amount
+        dust_amount,
+        telegram_bot_token,
     );
 
     tokio::spawn(async move {

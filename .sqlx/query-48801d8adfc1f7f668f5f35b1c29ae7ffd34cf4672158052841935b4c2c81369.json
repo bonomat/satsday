@@ -1,0 +1,12 @@
+{
+  "db_name": "SQLite",
+  "query": "\n        DELETE FROM telegram_registrations\n        WHERE chat_id = ?\n        ",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Right": 1
+    },
+    "nullable": []
+  },
+  "hash": "48801d8adfc1f7f668f5f35b1c29ae7ffd34cf4672158052841935b4c2c81369"
+}

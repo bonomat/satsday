@@ -1,0 +1,12 @@
+{
+  "db_name": "SQLite",
+  "query": "\n        UPDATE game_results\n        SET payment_successful = TRUE, output_tx_id = ?\n        WHERE id = ?\n        ",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Right": 2
+    },
+    "nullable": []
+  },
+  "hash": "a4b1fe62c012dcddc5a35aa4cc35876adb29912ab3c123063adf2cfe68b2f85d"
+}

@@ -1,0 +1,12 @@
+{
+  "db_name": "SQLite",
+  "query": "\n        INSERT OR IGNORE INTO telegram_registrations (chat_id)\n        VALUES (?)\n        ",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Right": 1
+    },
+    "nullable": []
+  },
+  "hash": "8cf1eab8368ae90d72fa68a30e0dc80c726bf5ec25e7b044dd90f59b2338339c"
+}

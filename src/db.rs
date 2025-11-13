@@ -255,3 +255,65 @@ pub async fn mark_payment_successful(
 
     Ok(())
 }
+
+pub async fn register_telegram_chat(pool: &Pool<Sqlite>, chat_id: &str) -> Result<(), sqlx::Error> {
+    sqlx::query!(
+        r#"
+        INSERT OR IGNORE INTO telegram_registrations (chat_id)
+        VALUES (?)
+        "#,
+        chat_id
+    )
+    .execute(pool)
+    .await?;
+
+    Ok(())
+}
+
+pub async fn unregister_telegram_chat(
+    pool: &Pool<Sqlite>,
+    chat_id: &str,
+) -> Result<(), sqlx::Error> {
+    sqlx::query!(
+        r#"
+        DELETE FROM telegram_registrations
+        WHERE chat_id = ?
+        "#,
+        chat_id
+    )
+    .execute(pool)
+    .await?;
+
+    Ok(())
+}
+
+pub async fn get_registered_telegram_chats(pool: &Pool<Sqlite>) -> Result<Vec<String>, sqlx::Error> {
+    let records = sqlx::query!(
+        r#"
+        SELECT chat_id
+        FROM telegram_registrations
+        "#
+    )
+    .fetch_all(pool)
+    .await?;
+
+    Ok(records.into_iter().map(|r| r.chat_id).collect())
+}
+
+pub async fn is_telegram_chat_registered(
+    pool: &Pool<Sqlite>,
+    chat_id: &str,
+) -> Result<bool, sqlx::Error> {
+    let result = sqlx::query!(
+        r#"
+        SELECT COUNT(*) as count
+        FROM telegram_registrations
+        WHERE chat_id = ?
+        "#,
+        chat_id
+    )
+    .fetch_one(pool)
+    .await?;
+
+    Ok(result.count > 0)
+}

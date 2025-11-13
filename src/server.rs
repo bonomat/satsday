@@ -155,6 +155,29 @@ pub async fn start_server_with_arc(
 
     let dust_amount = ark_client_arc.dust_value();
 
+    // Initialize Telegram bot if token is configured in environment
+    let telegram_token = Config::telegram_bot_token();
+    if let Some(ref token) = telegram_token {
+        tracing::info!("📱 Initializing Telegram bot...");
+
+        let secret = crate::telegram::generate_registration_secret();
+        tracing::info!("🔑 Telegram registration secret: {}", secret);
+        tracing::info!("📱 Users can register by sending: /start {}", secret);
+
+        // Spawn bot command handler in background
+        let bot_pool = pool.clone();
+        let bot_token = token.clone();
+        let bot_secret = secret.clone();
+        tokio::spawn(async move {
+            if let Err(e) = crate::telegram::run_telegram_bot(bot_pool, bot_token, bot_secret).await {
+                tracing::error!("❌ Telegram bot error: {:#}", e);
+            }
+        });
+        tracing::info!("🤖 Telegram bot command handler started");
+    } else {
+        tracing::info!("📱 Telegram bot disabled (no TELEGRAM_BOT_KEY env var)");
+    }
+
     // Start transaction monitoring in background
     spawn_transaction_monitor(
         ark_client_arc.clone(),
@@ -163,7 +186,8 @@ pub async fn start_server_with_arc(
         pool,
         broadcaster,
         config.max_payout_sats,
-        dust_amount
+        dust_amount,
+        telegram_token,
     )
     .await;
     tracing::info!("🔍 Transaction monitoring started with subscriptions");
