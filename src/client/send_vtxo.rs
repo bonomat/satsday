@@ -102,13 +102,8 @@ impl ArkClient {
             all_keys.push((game_address.vtxo.clone(), game_address.secret_key));
         }
 
-        let sign_fn = |_: &mut psbt::Input,
-                       msg: secp256k1::Message|
+        let sign_fn = |_: &mut psbt::Input, msg: secp256k1::Message|
          -> Result<(schnorr::Signature, XOnlyPublicKey), ark_core::Error> {
-            /*let sig = Secp256k1::new().sign_schnorr_no_aux_rand(&msg, self.kp());
-            let pk = self.kp().x_only_public_key().0;
-
-            Ok((sig, pk))*/
             let kp = all_keys.iter().find_map(|(v, sk)| {
                 // Try to match against all VTXOs we're spending
                 vtxo_inputs.iter().find_map(|input| {
@@ -144,14 +139,6 @@ impl ArkClient {
             sign_checkpoint_transaction(sign_fn, checkpoint_psbt)?;
         }
 
-        // timeout_op(
-        //     self.inner.timeout,
-        //     self.network_client()
-        //         .finalize_offchain_transaction(ark_txid, res.signed_checkpoint_txs),
-        // )
-        //     .await?
-        //     .map_err(Error::ark_server)
-        //     .context("failed to finalize offchain transaction")?;
         self.grpc_client
             .finalize_offchain_transaction(ark_txid, res.signed_checkpoint_txs)
             .await

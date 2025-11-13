@@ -367,7 +367,7 @@ impl TransactionProcessor {
         tracing::info!(
             payout = payout_sats,
             sender = winner.sender,
-            "💸 Processing individual dust payout"
+            "💸 Processing individual payout"
         );
 
         const MAX_RETRIES: u8 = 3;

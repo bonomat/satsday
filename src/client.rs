@@ -248,12 +248,7 @@ impl ArkClient {
         let spendable = if select_recoverable_vtxos {
             vtxo_outpoints.spendable_with_recoverable()
         } else {
-            let spendable = vtxo_outpoints.spendable();
-            spendable
-                .into_iter()
-                .filter(|v| !v.is_recoverable())
-                .cloned()
-                .collect::<Vec<_>>()
+            vtxo_outpoints.spendable().to_vec()
         };
 
         Ok((vtxo, spendable))
@@ -418,7 +413,7 @@ impl ArkClient {
             while let Some(result) = subscription_stream.next().await {
                 match result {
                     Ok(SubscriptionResponse::Event(response)) => {
-                        
+
                         let new_vtxos = response.new_vtxos;
 
                         for new_vtxo in new_vtxos {
