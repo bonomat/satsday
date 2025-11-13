@@ -197,44 +197,6 @@ impl ArkClient {
         Ok(spendable_vtxos)
     }
 
-    pub async fn spendable_offchain_vtxos(
-        &self,
-        select_recoverable_vtxos: bool,
-    ) -> Result<HashMap<Vtxo, Vec<ark_core::server::VirtualTxOutPoint>>> {
-        let main = self
-            ._spendable_vtxos(self.main_address.0.clone(), select_recoverable_vtxos)
-            .await?;
-
-        let game_addressess = self
-            .game_addresses
-            .iter()
-            .map(|a| a.vtxo.to_ark_address())
-            .collect::<Vec<_>>();
-
-        let request = GetVtxosRequest::new_for_addresses(game_addressess.as_slice());
-
-        let vtxo_outpoints = self.grpc_client.list_vtxos(request).await?;
-
-        let spendable = if select_recoverable_vtxos {
-            vtxo_outpoints.spendable_with_recoverable()
-        } else {
-            vtxo_outpoints.spendable().to_vec()
-        };
-
-        let mut spendable_vtxos = HashMap::new();
-        spendable_vtxos.insert(main.0, main.1);
-
-        for game_address in &self.game_addresses {
-            let outpoints = spendable
-                .clone()
-                .into_iter()
-                .filter(|vtop| vtop.script == game_address.vtxo.script_pubkey())
-                .collect::<Vec<_>>();
-            spendable_vtxos.insert(game_address.vtxo.clone(), outpoints);
-        }
-
-        Ok(spendable_vtxos)
-    }
 
     async fn _spendable_vtxos(
         &self,
