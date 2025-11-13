@@ -55,13 +55,29 @@ interface UseGameWebSocketReturn {
   reconnect: () => void;
 }
 
+interface UseGameWebSocketOptions {
+  onNewGameResult?: (game: GameHistoryItem) => void;
+  onNewDonation?: (donation: DonationItem) => void;
+}
+
 export function useGameWebSocket(
   maxItems: number = 20,
+  options?: UseGameWebSocketOptions,
 ): UseGameWebSocketReturn {
   const [activities, setActivities] = useState<GameHistoryItem[]>([]);
   const [donations, setDonations] = useState<DonationItem[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const didUnmount = useRef(false);
+
+  // Store callbacks in refs to avoid dependency issues
+  const onNewGameResultRef = useRef(options?.onNewGameResult);
+  const onNewDonationRef = useRef(options?.onNewDonation);
+
+  // Update refs when callbacks change
+  useEffect(() => {
+    onNewGameResultRef.current = options?.onNewGameResult;
+    onNewDonationRef.current = options?.onNewDonation;
+  }, [options?.onNewGameResult, options?.onNewDonation]);
 
   // Get WebSocket URL
   const getWebSocketUrl = useCallback(() => {
@@ -114,7 +130,7 @@ export function useGameWebSocket(
         const data: WebSocketMessage = JSON.parse(lastMessage.data);
 
         if (data.type === "history") {
-          // Initial history load
+          // Initial history load - don't trigger callbacks
           setActivities(data.games.slice(0, maxItems));
           setIsLoading(false);
         } else if (data.type === "game_result") {
@@ -141,6 +157,9 @@ export function useGameWebSocket(
               maxItems,
             ),
           );
+
+          // Notify subscriber of new game result
+          onNewGameResultRef.current?.(gameItem);
         } else if (data.type === "donation") {
           // Real-time donation notification
           const donationItem: DonationItem = {
@@ -158,6 +177,9 @@ export function useGameWebSocket(
               ...prev.filter((d) => d.id !== donationItem.id),
             ].slice(0, maxItems),
           );
+
+          // Notify subscriber of new donation
+          onNewDonationRef.current?.(donationItem);
         }
       } catch (error) {
         console.error("Failed to parse WebSocket message:", error);

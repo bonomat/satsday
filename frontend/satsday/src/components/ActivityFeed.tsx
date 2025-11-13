@@ -9,7 +9,7 @@ import {
   CheckCircle,
   Heart,
 } from "lucide-react";
-import { useState, useMemo, useEffect, useRef } from "react";
+import { useState, useMemo } from "react";
 import { useGameWebSocket, type DonationItem } from "@/hooks/useGameWebSocket";
 import { Button } from "./ui/button";
 import {
@@ -28,14 +28,29 @@ type FeedItem = {
 };
 
 const ActivityFeed = () => {
+  const [copiedTxId, setCopiedTxId] = useState<string | null>(null);
+
   const {
     activities,
     donations,
     isConnected: wsConnected,
     isLoading: loading,
-  } = useGameWebSocket(20);
-  const [copiedTxId, setCopiedTxId] = useState<string | null>(null);
-  const seenGameIds = useRef(new Set<string>());
+  } = useGameWebSocket(20, {
+    onNewGameResult: (game) => {
+      // Only show toast for new winning games
+      if (game.is_win) {
+        toast.success("Winning Game!", {
+          description: `Someone won ${game.payout} sats with ${game.multiplier}x multiplier`,
+        });
+      }
+    },
+    onNewDonation: (donation) => {
+      // Optionally show toast for donations too
+      toast.success("New Donation!", {
+        description: `${donation.amount} sats from ${donation.sender.slice(0, 10)}...`,
+      });
+    },
+  });
 
   // Combine and sort activities and donations by timestamp
   const combinedFeed = useMemo(() => {
@@ -55,22 +70,6 @@ const ActivityFeed = () => {
       .sort((a, b) => b.timestamp - a.timestamp)
       .slice(0, 20);
   }, [activities, donations]);
-
-  // Show toast for winning games
-  useEffect(() => {
-    activities.forEach((activity) => {
-      // Only show toast for wins that we haven't seen before
-      if (activity.is_win && !seenGameIds.current.has(activity.id)) {
-        seenGameIds.current.add(activity.id);
-        toast.success("Winning Game!", {
-          description: `Someone won ${activity.payout} sats with ${activity.multiplier}x multiplier`,
-        });
-      } else if (!activity.is_win && !seenGameIds.current.has(activity.id)) {
-        // Mark as seen even if not a win, to avoid processing it again
-        seenGameIds.current.add(activity.id);
-      }
-    });
-  }, [activities]);
 
   const copyToClipboard = async (text: string, txType: string) => {
     try {
