@@ -38,7 +38,10 @@ enum Commands {
         amount: u64,
     },
     Settle,
-    CatchupMissedGames,
+    CatchupMissedGames {
+        #[arg(short, long, help = "Dry run - show what would be paid without modifying DB or sending payments")]
+        dry_run: bool,
+    },
 }
 
 #[tokio::main]
@@ -154,8 +157,12 @@ async fn main() -> Result<()> {
                 );
             }
         }
-        Commands::CatchupMissedGames => {
-            tracing::info!("🔍 Starting missed games catchup process...");
+        Commands::CatchupMissedGames { dry_run } => {
+            if dry_run {
+                tracing::info!("🔍 Starting missed games catchup process (DRY RUN - no changes will be made)...");
+            } else {
+                tracing::info!("🔍 Starting missed games catchup process...");
+            }
 
             // Create nonce service
             let nonce_service = satoshi_dice::nonce_service::spawn_nonce_service(pool.clone(), 1, 1).await;
@@ -167,11 +174,16 @@ async fn main() -> Result<()> {
                 &pool,
                 &nonce_service,
                 config.max_payout_sats,
+                dry_run,
             )
             .await
             {
                 Ok(()) => {
-                    tracing::info!("✅ Missed games catchup completed successfully");
+                    if dry_run {
+                        tracing::info!("✅ Missed games catchup dry run completed successfully");
+                    } else {
+                        tracing::info!("✅ Missed games catchup completed successfully");
+                    }
                 }
                 Err(e) => {
                     tracing::error!("❌ Missed games catchup failed: {:#}", e);

@@ -17,8 +17,13 @@ pub async fn process_missed_games(
     pool: &Pool<Sqlite>,
     nonce_service: &NonceService,
     max_payout_sats: u64,
+    dry_run: bool,
 ) -> Result<()> {
-    tracing::info!("🔍 Checking for missed games by scanning all game address VTXOs...");
+    if dry_run {
+        tracing::info!("🔍 Checking for missed games by scanning all game address VTXOs (DRY RUN)...");
+    } else {
+        tracing::info!("🔍 Checking for missed games by scanning all game address VTXOs...");
+    }
     ark_client.sync_spendable_vtxos().await?;
 
     // Get all game addresses
@@ -43,6 +48,8 @@ pub async fn process_missed_games(
     let mut own_transactions = 0;
     let mut successful_payouts = 0;
     let mut failed_payouts = 0;
+    let mut total_payout_amount = 0u64;
+    let mut donation_count = 0;
 
     for vtxo in vtxos {
         let tx_id = vtxo.outpoint.txid.to_string();
@@ -106,30 +113,40 @@ pub async fn process_missed_games(
         // Check donation threshold
         let donation_threshold = (max_payout_sats * 100) / multiplier.multiplier();
         if input_amount > donation_threshold {
-            tracing::info!(
-                "💝 Missed donation detected: amount={} sats (threshold: {}), sender={}",
-                input_amount,
-                donation_threshold,
-                sender_address.encode()
-            );
+            donation_count += 1;
+            if dry_run {
+                tracing::info!(
+                    "💝 [DRY RUN] Would record donation: amount={} sats (threshold: {}), sender={}",
+                    input_amount,
+                    donation_threshold,
+                    sender_address.encode()
+                );
+            } else {
+                tracing::info!(
+                    "💝 Missed donation detected: amount={} sats (threshold: {}), sender={}",
+                    input_amount,
+                    donation_threshold,
+                    sender_address.encode()
+                );
 
-            // Store as donation
-            if let Err(e) = db::insert_game_result(
-                pool,
-                &current_nonce.to_string(),
-                -1, // Special value for donations
-                &tx_id,
-                None,
-                input_amount as i64,
-                None,
-                &sender_address.encode(),
-                false,
-                false,
-                multiplier.multiplier() as i64,
-            )
-            .await
-            {
-                tracing::error!("Failed to store missed donation: {}", e);
+                // Store as donation
+                if let Err(e) = db::insert_game_result(
+                    pool,
+                    &current_nonce.to_string(),
+                    -1, // Special value for donations
+                    &tx_id,
+                    None,
+                    input_amount as i64,
+                    None,
+                    &sender_address.encode(),
+                    false,
+                    false,
+                    multiplier.multiplier() as i64,
+                )
+                .await
+                {
+                    tracing::error!("Failed to store missed donation: {}", e);
+                }
             }
             continue;
         }
@@ -147,141 +164,191 @@ pub async fn process_missed_games(
         };
 
         if is_win {
-            tracing::info!(
-                "🎰 Missed WINNER found! txid={}, amount={} sats, payout={} sats, rolled={}, target={}",
-                tx_id,
-                input_amount,
-                payout_amount.unwrap(),
-                evaluation.rolled_value,
-                multiplier.get_lower_than()
-            );
+            let payout_sats = payout_amount.unwrap();
+            total_payout_amount += payout_sats;
 
-            // Process payout
-            const MAX_RETRIES: u8 = 3;
-            let mut retry_count = 0;
-            let mut payout_sent = false;
-            let mut output_txid = String::new();
+            if dry_run {
+                tracing::info!(
+                    "🎰 [DRY RUN] Would pay WINNER! txid={}, amount={} sats, payout={} sats, rolled={}, target={}",
+                    tx_id,
+                    input_amount,
+                    payout_sats,
+                    evaluation.rolled_value,
+                    multiplier.get_lower_than()
+                );
+                successful_payouts += 1;
+            } else {
+                tracing::info!(
+                    "🎰 Missed WINNER found! txid={}, amount={} sats, payout={} sats, rolled={}, target={}",
+                    tx_id,
+                    input_amount,
+                    payout_sats,
+                    evaluation.rolled_value,
+                    multiplier.get_lower_than()
+                );
 
-            while retry_count < MAX_RETRIES {
-                ark_client.sync_spendable_vtxos().await?;
+                // Process payout
+                const MAX_RETRIES: u8 = 3;
+                let mut retry_count = 0;
+                let mut payout_sent = false;
+                let mut output_txid = String::new();
 
-                match ark_client
-                    .send_vtxo(sender_address, Amount::from_sat(payout_amount.unwrap()))
-                    .await
-                {
-                    Ok(txid) => {
-                        tracing::info!(
-                            "✅ Missed game payout sent: payout_txid={}, amount={} sats",
-                            txid,
-                            payout_amount.unwrap()
-                        );
-                        output_txid = txid.to_string();
-                        payout_sent = true;
+                while retry_count < MAX_RETRIES {
+                    ark_client.sync_spendable_vtxos().await?;
 
-                        // Store as our own transaction
-                        if let Err(e) =
-                            db::insert_own_transaction(pool, &output_txid, "missed_game_payout")
-                                .await
-                        {
-                            tracing::error!("Failed to store own transaction: {}", e);
+                    match ark_client
+                        .send_vtxo(sender_address, Amount::from_sat(payout_sats))
+                        .await
+                    {
+                        Ok(txid) => {
+                            tracing::info!(
+                                "✅ Missed game payout sent: payout_txid={}, amount={} sats",
+                                txid,
+                                payout_sats
+                            );
+                            output_txid = txid.to_string();
+                            payout_sent = true;
+
+                            // Store as our own transaction
+                            if let Err(e) =
+                                db::insert_own_transaction(pool, &output_txid, "missed_game_payout")
+                                    .await
+                            {
+                                tracing::error!("Failed to store own transaction: {}", e);
+                            }
+
+                            successful_payouts += 1;
+                            break;
                         }
+                        Err(e) => {
+                            retry_count += 1;
+                            tracing::error!(
+                                "Failed to send missed payout (attempt {}/{}): {:#}",
+                                retry_count,
+                                MAX_RETRIES,
+                                e
+                            );
 
-                        successful_payouts += 1;
-                        break;
-                    }
-                    Err(e) => {
-                        retry_count += 1;
-                        tracing::error!(
-                            "Failed to send missed payout (attempt {}/{}): {:#}",
-                            retry_count,
-                            MAX_RETRIES,
-                            e
-                        );
-
-                        if retry_count < MAX_RETRIES {
-                            tokio::time::sleep(tokio::time::Duration::from_secs(5)).await;
+                            if retry_count < MAX_RETRIES {
+                                tokio::time::sleep(tokio::time::Duration::from_secs(5)).await;
+                            }
                         }
                     }
                 }
-            }
 
-            // Store game result in database
-            if let Err(e) = db::insert_game_result(
-                pool,
-                &current_nonce.to_string(),
-                evaluation.rolled_value,
-                &tx_id,
-                if payout_sent { Some(&output_txid) } else { None },
-                input_amount as i64,
-                payout_amount.map(|p| p as i64),
-                &sender_address.encode(),
-                true,
-                payout_sent,
-                multiplier.multiplier() as i64,
-            )
-            .await
-            {
-                tracing::error!("Failed to store missed winning game: {:#}", e);
-            }
+                // Store game result in database
+                if let Err(e) = db::insert_game_result(
+                    pool,
+                    &current_nonce.to_string(),
+                    evaluation.rolled_value,
+                    &tx_id,
+                    if payout_sent { Some(&output_txid) } else { None },
+                    input_amount as i64,
+                    payout_amount.map(|p| p as i64),
+                    &sender_address.encode(),
+                    true,
+                    payout_sent,
+                    multiplier.multiplier() as i64,
+                )
+                .await
+                {
+                    tracing::error!("Failed to store missed winning game: {:#}", e);
+                }
 
-            if !payout_sent {
-                failed_payouts += 1;
+                if !payout_sent {
+                    failed_payouts += 1;
+                }
             }
         } else {
-            tracing::debug!(
-                "Missed loser: txid={}, rolled={}, target={}",
-                tx_id,
-                evaluation.rolled_value,
-                multiplier.get_lower_than()
-            );
+            if dry_run {
+                tracing::debug!(
+                    "[DRY RUN] Would record loser: txid={}, rolled={}, target={}",
+                    tx_id,
+                    evaluation.rolled_value,
+                    multiplier.get_lower_than()
+                );
+            } else {
+                tracing::debug!(
+                    "Missed loser: txid={}, rolled={}, target={}",
+                    tx_id,
+                    evaluation.rolled_value,
+                    multiplier.get_lower_than()
+                );
 
-            // Store losing game result
-            if let Err(e) = db::insert_game_result(
-                pool,
-                &current_nonce.to_string(),
-                evaluation.rolled_value,
-                &tx_id,
-                None,
-                input_amount as i64,
-                None,
-                &sender_address.encode(),
-                false,
-                true, // Not a payout needed
-                multiplier.multiplier() as i64,
-            )
-            .await
-            {
-                tracing::error!("Failed to store missed losing game: {:#}", e);
+                // Store losing game result
+                if let Err(e) = db::insert_game_result(
+                    pool,
+                    &current_nonce.to_string(),
+                    evaluation.rolled_value,
+                    &tx_id,
+                    None,
+                    input_amount as i64,
+                    None,
+                    &sender_address.encode(),
+                    false,
+                    true, // Not a payout needed
+                    multiplier.multiplier() as i64,
+                )
+                .await
+                {
+                    tracing::error!("Failed to store missed losing game: {:#}", e);
+                }
             }
         }
     }
 
-    tracing::info!(
-        "📊 Missed games scan summary: {} new games, {} already processed, {} own transactions",
-        new_games,
-        already_processed,
-        own_transactions
-    );
-
-    if failed_payouts > 0 {
-        tracing::error!(
-            "⚠️  Missed games recovery completed: {} payouts sent, {} FAILED",
-            successful_payouts,
-            failed_payouts
-        );
-        Err(anyhow::anyhow!(
-            "{} missed game payouts failed",
-            failed_payouts
-        ))
-    } else if new_games > 0 {
+    if dry_run {
         tracing::info!(
-            "✅ All {} missed games processed successfully ({} payouts sent)",
+            "📊 [DRY RUN] Summary: {} new games found ({} winners, {} donations), {} already processed, {} own transactions",
             new_games,
-            successful_payouts
+            successful_payouts,
+            donation_count,
+            already_processed,
+            own_transactions
         );
+        tracing::info!(
+            "💰 [DRY RUN] Total payout amount that would be sent: {} sats",
+            total_payout_amount
+        );
+        if new_games > 0 {
+            tracing::info!(
+                "✅ [DRY RUN] Would process {} missed games ({} winners for {} sats total)",
+                new_games,
+                successful_payouts,
+                total_payout_amount
+            );
+        } else {
+            tracing::info!("✅ [DRY RUN] No missed games found - all transactions are up to date");
+        }
         Ok(())
     } else {
-        tracing::info!("✅ No missed games found - all transactions are up to date");
-        Ok(())
+        tracing::info!(
+            "📊 Missed games scan summary: {} new games, {} already processed, {} own transactions",
+            new_games,
+            already_processed,
+            own_transactions
+        );
+
+        if failed_payouts > 0 {
+            tracing::error!(
+                "⚠️  Missed games recovery completed: {} payouts sent, {} FAILED",
+                successful_payouts,
+                failed_payouts
+            );
+            Err(anyhow::anyhow!(
+                "{} missed game payouts failed",
+                failed_payouts
+            ))
+        } else if new_games > 0 {
+            tracing::info!(
+                "✅ All {} missed games processed successfully ({} payouts sent)",
+                new_games,
+                successful_payouts
+            );
+            Ok(())
+        } else {
+            tracing::info!("✅ No missed games found - all transactions are up to date");
+            Ok(())
+        }
     }
 }

@@ -1,4 +1,4 @@
 ark_server_url = "https://arkade.computer/v1"
 esplora_url = "https://mempool.space/api"
-master_seed_file = "./mainnet_seed_file.seed"
-database = "./db.sqlite"
+master_seed_file = "./mainnet/main_seed_file.seed"
+database = "./mainnet/db.sqlite"
