@@ -50,6 +50,113 @@ pub async fn process_missed_games(
     let mut failed_payouts = 0;
     let mut total_payout_amount = 0u64;
     let mut donation_count = 0;
+    let mut retry_payouts = 0;
+
+    // First, handle unpaid winners from database
+    tracing::info!("🔍 Checking for unpaid winners in database...");
+    let unpaid_winners = db::get_unpaid_winners(pool).await?;
+
+    if !unpaid_winners.is_empty() {
+        tracing::info!("Found {} unpaid winners to process", unpaid_winners.len());
+
+        for winner in unpaid_winners {
+            retry_payouts += 1;
+            let payout_sats = winner.winning_amount.unwrap_or(0) as u64;
+            total_payout_amount += payout_sats;
+
+            if dry_run {
+                tracing::info!(
+                    "🎰 [DRY RUN] Would retry payout for winner: game_id={}, player={}, payout={} sats",
+                    winner.id,
+                    winner.player_address,
+                    payout_sats
+                );
+                successful_payouts += 1;
+            } else {
+                tracing::info!(
+                    "🎰 Retrying payout for unpaid winner: game_id={}, player={}, payout={} sats",
+                    winner.id,
+                    winner.player_address,
+                    payout_sats
+                );
+
+                // Decode player address
+                let player_address = match ark_core::ArkAddress::decode(&winner.player_address) {
+                    Ok(addr) => addr,
+                    Err(e) => {
+                        tracing::error!("Failed to decode player address {}: {}", winner.player_address, e);
+                        failed_payouts += 1;
+                        continue;
+                    }
+                };
+
+                // Attempt to send payout with retries
+                const MAX_RETRIES: u8 = 3;
+                let mut retry_count = 0;
+                let mut payout_sent = false;
+
+                while retry_count < MAX_RETRIES {
+                    ark_client.sync_spendable_vtxos().await?;
+
+                    match ark_client
+                        .send_vtxo(player_address, Amount::from_sat(payout_sats))
+                        .await
+                    {
+                        Ok(txid) => {
+                            let output_txid = txid.to_string();
+                            tracing::info!(
+                                "✅ Retry payout sent: game_id={}, payout_txid={}, amount={} sats",
+                                winner.id,
+                                txid,
+                                payout_sats
+                            );
+                            payout_sent = true;
+
+                            // Store as our own transaction
+                            if let Err(e) =
+                                db::insert_own_transaction(pool, &output_txid, "retry_payout")
+                                    .await
+                            {
+                                tracing::error!("Failed to store own transaction: {}", e);
+                            }
+
+                            // Mark as paid in database
+                            if let Err(e) = db::mark_payment_successful(pool, winner.id, &output_txid).await {
+                                tracing::error!("Failed to mark payment as successful: {}", e);
+                            }
+
+                            successful_payouts += 1;
+                            break;
+                        }
+                        Err(e) => {
+                            retry_count += 1;
+                            tracing::error!(
+                                "Failed to send retry payout (attempt {}/{}): {:#}",
+                                retry_count,
+                                MAX_RETRIES,
+                                e
+                            );
+
+                            if retry_count < MAX_RETRIES {
+                                tokio::time::sleep(tokio::time::Duration::from_secs(5)).await;
+                            }
+                        }
+                    }
+                }
+
+                if !payout_sent {
+                    failed_payouts += 1;
+                    tracing::error!(
+                        "❌ Failed to send retry payout after {} attempts for game_id={}",
+                        MAX_RETRIES,
+                        winner.id
+                    );
+                }
+            }
+        }
+    } else {
+        tracing::info!("✅ No unpaid winners found in database");
+    }
 
     for vtxo in vtxos {
         let tx_id = vtxo.outpoint.txid.to_string();
@@ -299,9 +406,10 @@ pub async fn process_missed_games(
 
     if dry_run {
         tracing::info!(
-            "📊 [DRY RUN] Summary: {} new games found ({} winners, {} donations), {} already processed, {} own transactions",
+            "📊 [DRY RUN] Summary: {} unpaid winners to retry, {} new games found ({} winners, {} donations), {} already processed, {} own transactions",
+            retry_payouts,
             new_games,
-            successful_payouts,
+            successful_payouts - retry_payouts,
             donation_count,
             already_processed,
             own_transactions
@@ -310,20 +418,22 @@ pub async fn process_missed_games(
             "💰 [DRY RUN] Total payout amount that would be sent: {} sats",
             total_payout_amount
         );
-        if new_games > 0 {
+        if retry_payouts > 0 || new_games > 0 {
             tracing::info!(
-                "✅ [DRY RUN] Would process {} missed games ({} winners for {} sats total)",
+                "✅ [DRY RUN] Would process {} retry payouts + {} new games ({} total payouts for {} sats)",
+                retry_payouts,
                 new_games,
                 successful_payouts,
                 total_payout_amount
             );
         } else {
-            tracing::info!("✅ [DRY RUN] No missed games found - all transactions are up to date");
+            tracing::info!("✅ [DRY RUN] No unpaid winners or missed games found - all up to date");
         }
         Ok(())
     } else {
         tracing::info!(
-            "📊 Missed games scan summary: {} new games, {} already processed, {} own transactions",
+            "📊 Recovery summary: {} retry payouts, {} new games, {} already processed, {} own transactions",
+            retry_payouts,
             new_games,
             already_processed,
             own_transactions
@@ -331,23 +441,24 @@ pub async fn process_missed_games(
 
         if failed_payouts > 0 {
             tracing::error!(
-                "⚠️  Missed games recovery completed: {} payouts sent, {} FAILED",
+                "⚠️  Recovery completed: {} payouts sent, {} FAILED",
                 successful_payouts,
                 failed_payouts
             );
             Err(anyhow::anyhow!(
-                "{} missed game payouts failed",
+                "{} game payouts failed",
                 failed_payouts
             ))
-        } else if new_games > 0 {
+        } else if retry_payouts > 0 || new_games > 0 {
             tracing::info!(
-                "✅ All {} missed games processed successfully ({} payouts sent)",
+                "✅ Recovery completed successfully: {} retry payouts + {} new games ({} total payouts sent)",
+                retry_payouts,
                 new_games,
                 successful_payouts
             );
             Ok(())
         } else {
-            tracing::info!("✅ No missed games found - all transactions are up to date");
+            tracing::info!("✅ No unpaid winners or missed games found - all transactions are up to date");
             Ok(())
         }
     }
