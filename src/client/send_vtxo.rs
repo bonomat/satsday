@@ -100,7 +100,7 @@ impl ArkClient {
             all_keys.push((game_address.vtxo.clone(), game_address.secret_key));
         }
 
-        let sign_fn = |psbt: &mut psbt::Input, msg: secp256k1::Message, index: usize|
+        let sign_fn = |_psbt: &mut psbt::Input, msg: secp256k1::Message, index: usize|
                        -> Result<(schnorr::Signature, XOnlyPublicKey), ark_core::Error> {
             let input = vtxo_inputs.get(index).expect("input");
             let kp = all_keys.iter().find_map(|(v, sk)| {
