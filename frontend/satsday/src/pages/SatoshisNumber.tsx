@@ -323,10 +323,12 @@ export default function SatoshisNumber() {
                 {/* QR Code */}
                 <div className="text-center space-y-3">
                   <div className="text-center space-y-2">
-                    <QRCode
-                      value={`${selectedAddress?.address}`}
-                      className="mx-auto border border-border rounded-lg"
-                    />
+                    <div className="inline-block p-4 bg-white rounded-lg">
+                      <QRCode
+                        value={`${selectedAddress?.address}`}
+                        className="mx-auto"
+                      />
+                    </div>
                   </div>
 
                   {/* Address */}
