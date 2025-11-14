@@ -428,9 +428,8 @@ impl TransactionProcessor {
                     tracing::error!(
                         retry = retry_count,
                         max_retries = MAX_RETRIES,
-                        error = ?e,
                         payout = payout_sats,
-                        "🚨 Failed to send individual payout"
+                        "🚨 Failed to send individual payout {e:#}"
                     );
 
                     if retry_count >= MAX_RETRIES {
