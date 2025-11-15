@@ -111,6 +111,24 @@ impl Multiplier {
             Multiplier::X100000,
         ]
     }
+
+    /// Create from stored multiplier value (e.g., 105 for 1.05x, 200 for 2.0x)
+    pub fn from_value(value: u64) -> Option<Self> {
+        match value {
+            105 => Some(Multiplier::X105),
+            110 => Some(Multiplier::X110),
+            133 => Some(Multiplier::X133),
+            150 => Some(Multiplier::X150),
+            200 => Some(Multiplier::X200),
+            300 => Some(Multiplier::X300),
+            1000 => Some(Multiplier::X1000),
+            2500 => Some(Multiplier::X2500),
+            5000 => Some(Multiplier::X5000),
+            10000 => Some(Multiplier::X10000),
+            100000 => Some(Multiplier::X100000),
+            _ => None,
+        }
+    }
 }
 
 impl std::fmt::Display for Multiplier {

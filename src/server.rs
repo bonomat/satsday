@@ -317,7 +317,13 @@ async fn get_games(
     let mut game_items: Vec<GameHistoryItem> = Vec::new();
 
     for game in games {
-        let target_number = (65536.0 * 1000.0 / game.multiplier as f64) as i64;
+        use crate::key_derivation::Multiplier;
+        let multiplier = Multiplier::from_value(game.multiplier as u64)
+            .ok_or_else(|| {
+                tracing::error!("Unknown multiplier value in database: {}", game.multiplier);
+                StatusCode::INTERNAL_SERVER_ERROR
+            })?;
+        let target_number = multiplier.get_lower_than() as i64;
 
         let revealable_nonce = state.nonce_service.get_revealable_nonce(&game.nonce).await;
         let nonce_hash = if revealable_nonce.is_some() {
@@ -444,7 +450,20 @@ async fn handle_websocket(socket: axum::extract::ws::WebSocket, state: AppState)
             let mut game_items: Vec<GameHistoryItem> = Vec::new();
 
             for game in games {
-                let target_number = (65536.0 * 1000.0 / game.multiplier as f64) as i64;
+                use crate::key_derivation::Multiplier;
+                let multiplier = Multiplier::from_value(game.multiplier as u64)
+                    .ok_or_else(|| {
+                        tracing::error!("Unknown multiplier value in database: {}", game.multiplier);
+                    });
+
+                let multiplier = match multiplier {
+                    Ok(m) => m,
+                    Err(_) => {
+                        tracing::warn!("Skipping game with invalid multiplier: {}", game.multiplier);
+                        continue;
+                    }
+                };
+                let target_number = multiplier.get_lower_than() as i64;
 
                 let revealable_nonce = state.nonce_service.get_revealable_nonce(&game.nonce).await;
                 let nonce_hash = if revealable_nonce.is_some() {
