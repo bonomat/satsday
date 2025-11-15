@@ -317,3 +317,125 @@ pub async fn is_telegram_chat_registered(
 
     Ok(result.count > 0)
 }
+
+#[derive(Debug)]
+pub struct DatabaseStats {
+    pub total_games: i64,
+    pub total_winners: i64,
+    pub total_losers: i64,
+    pub unpaid_winners: i64,
+    pub total_bet_amount: i64,
+    pub total_payout_amount: i64,
+    pub total_house_profit: i64,
+}
+
+#[derive(Debug)]
+pub struct MultiplierStats {
+    pub multiplier: i64,
+    pub total_games: i64,
+    pub total_winners: i64,
+    pub total_losers: i64,
+    pub total_bet_amount: i64,
+    pub total_payout_amount: i64,
+}
+
+pub async fn get_database_stats(pool: &Pool<Sqlite>) -> Result<DatabaseStats, sqlx::Error> {
+    let total_games = sqlx::query!(
+        r#"
+        SELECT COUNT(*) as count
+        FROM game_results
+        WHERE rolled_number != -1
+        "#
+    )
+    .fetch_one(pool)
+    .await?
+    .count;
+
+    let total_winners = sqlx::query!(
+        r#"
+        SELECT COUNT(*) as count
+        FROM game_results
+        WHERE is_winner = TRUE
+        "#
+    )
+    .fetch_one(pool)
+    .await?
+    .count;
+
+    let total_losers = sqlx::query!(
+        r#"
+        SELECT COUNT(*) as count
+        FROM game_results
+        WHERE is_winner = FALSE AND rolled_number != -1
+        "#
+    )
+    .fetch_one(pool)
+    .await?
+    .count;
+
+    let unpaid_winners = sqlx::query!(
+        r#"
+        SELECT COUNT(*) as count
+        FROM game_results
+        WHERE is_winner = TRUE AND payment_successful = FALSE
+        "#
+    )
+    .fetch_one(pool)
+    .await?
+    .count;
+
+    let bet_stats = sqlx::query!(
+        r#"
+        SELECT
+            COALESCE(SUM(bet_amount), 0) as total_bet,
+            COALESCE(SUM(CASE WHEN winning_amount IS NOT NULL THEN winning_amount ELSE 0 END), 0) as total_payout
+        FROM game_results
+        WHERE rolled_number != -1
+        "#
+    )
+    .fetch_one(pool)
+    .await?;
+
+    let total_bet_amount = bet_stats.total_bet;
+    let total_payout_amount = bet_stats.total_payout;
+    let total_house_profit = total_bet_amount - total_payout_amount;
+
+    Ok(DatabaseStats {
+        total_games,
+        total_winners,
+        total_losers,
+        unpaid_winners,
+        total_bet_amount,
+        total_payout_amount,
+        total_house_profit,
+    })
+}
+
+pub async fn get_stats_by_multiplier(pool: &Pool<Sqlite>) -> Result<Vec<MultiplierStats>, sqlx::Error> {
+    let stats = sqlx::query!(
+        r#"
+        SELECT
+            multiplier,
+            COUNT(*) as total_games,
+            SUM(CASE WHEN is_winner = TRUE THEN 1 ELSE 0 END) as total_winners,
+            SUM(CASE WHEN is_winner = FALSE THEN 1 ELSE 0 END) as total_losers,
+            SUM(bet_amount) as total_bet,
+            COALESCE(SUM(CASE WHEN winning_amount IS NOT NULL THEN winning_amount ELSE 0 END), 0) as total_payout
+        FROM game_results
+        WHERE rolled_number != -1
+        GROUP BY multiplier
+        ORDER BY multiplier ASC
+        "#
+    )
+    .fetch_all(pool)
+    .await?;
+
+    Ok(stats.into_iter().map(|s| MultiplierStats {
+        multiplier: s.multiplier,
+        total_games: s.total_games,
+        total_winners: s.total_winners,
+        total_losers: s.total_losers,
+        total_bet_amount: s.total_bet,
+        total_payout_amount: s.total_payout,
+    }).collect())
+}

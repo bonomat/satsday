@@ -134,14 +134,18 @@ async fn main() -> Result<()> {
             }
         }
         Commands::Stats => {
+            tracing::info!("📊 Fetching statistics...");
+
+            // VTXO Stats (from Ark server)
+            tracing::info!("🔍 Scanning VTXOs on Ark server...");
             let game_addresses = client.get_game_addresses();
-            let game_addresses = game_addresses
+            let game_addresses_list = game_addresses
                 .into_iter()
                 .map(|(_, _, address)| address)
                 .collect::<Vec<_>>();
 
-            let vtxos = client.list_vtxos(game_addresses.as_slice()).await?;
-            tracing::info!(number = vtxos.len(), "Total games");
+            let vtxos = client.list_vtxos(game_addresses_list.as_slice()).await?;
+            tracing::info!(number = vtxos.len(), "📡 Total VTXOs on Ark server");
             let mut all_received = bitcoin::Amount::ZERO;
             for (game, multiplier, ark_address) in client.get_game_addresses() {
                 let per_address = vtxos
@@ -154,13 +158,81 @@ async fn main() -> Result<()> {
                     number_of_games = per_address.len(),
                     total_received = %total_received,
                     address = ark_address.encode(),
-                    "👾Game Address {game}-{multiplier}",
-
+                    "👾 Game Address {game}-{multiplier}",
                 );
             }
             tracing::info!(
                 total_received = %all_received,
-                "Total received")
+                "💰 Total received on Ark server"
+            );
+
+            // Database Stats
+            tracing::info!("💾 Fetching database statistics...");
+            let db_stats = db::get_database_stats(&pool).await?;
+
+            tracing::info!("📊 Database Statistics:");
+            tracing::info!(
+                total_games = db_stats.total_games,
+                winners = db_stats.total_winners,
+                losers = db_stats.total_losers,
+                unpaid_winners = db_stats.unpaid_winners,
+                "🎲 Games processed"
+            );
+
+            let win_rate = if db_stats.total_games > 0 {
+                (db_stats.total_winners as f64 / db_stats.total_games as f64) * 100.0
+            } else {
+                0.0
+            };
+
+            tracing::info!(
+                win_rate = format!("{:.2}%", win_rate),
+                "📈 Win rate"
+            );
+
+            tracing::info!(
+                total_bet = %bitcoin::Amount::from_sat(db_stats.total_bet_amount as u64),
+                total_payout = %bitcoin::Amount::from_sat(db_stats.total_payout_amount as u64),
+                house_profit = %bitcoin::Amount::from_sat(db_stats.total_house_profit as u64),
+                "💵 Financial summary"
+            );
+
+            if db_stats.unpaid_winners > 0 {
+                tracing::warn!(
+                    unpaid_winners = db_stats.unpaid_winners,
+                    "⚠️  Unpaid winners detected! Run 'catchup-missed-games' to process"
+                );
+            }
+
+            // Per-multiplier stats
+            tracing::info!("📊 Win Rate by Multiplier:");
+            let multiplier_stats = db::get_stats_by_multiplier(&pool).await?;
+            for stat in multiplier_stats {
+                let multiplier_display = stat.multiplier as f64 / 100.0;
+                let win_rate = if stat.total_games > 0 {
+                    (stat.total_winners as f64 / stat.total_games as f64) * 100.0
+                } else {
+                    0.0
+                };
+                let house_profit = stat.total_bet_amount - stat.total_payout_amount;
+                let house_profit_display = if house_profit >= 0 {
+                    format!("+{}", bitcoin::Amount::from_sat(house_profit as u64))
+                } else {
+                    format!("-{}", bitcoin::Amount::from_sat((-house_profit) as u64))
+                };
+
+                tracing::info!(
+                    multiplier = format!("{:.2}x", multiplier_display),
+                    games = stat.total_games,
+                    winners = stat.total_winners,
+                    losers = stat.total_losers,
+                    win_rate = format!("{:.2}%", win_rate),
+                    total_bet = %bitcoin::Amount::from_sat(stat.total_bet_amount as u64),
+                    total_payout = %bitcoin::Amount::from_sat(stat.total_payout_amount as u64),
+                    house_profit = house_profit_display,
+                    "  🎯 Multiplier stats"
+                );
+            }
         }
         Commands::CatchupMissedGames { dry_run } => {
             if dry_run {
