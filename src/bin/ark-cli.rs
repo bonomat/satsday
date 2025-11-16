@@ -38,8 +38,12 @@ enum Commands {
         amount: u64,
     },
     Settle,
+    CatchupMissedPayouts {
+        #[arg(short, long, help = "Dry run - show what would be paid without sending payments")]
+        dry_run: bool,
+    },
     CatchupMissedGames {
-        #[arg(short, long, help = "Dry run - show what would be paid without modifying DB or sending payments")]
+        #[arg(short, long, help = "Dry run - show what would be paid without modifying DB")]
         dry_run: bool,
     },
 }
@@ -234,6 +238,37 @@ async fn main() -> Result<()> {
                 );
             }
         }
+        Commands::CatchupMissedPayouts { dry_run } => {
+            if dry_run {
+                tracing::info!("🔍 Starting missed games catchup process (DRY RUN - no changes will be made)...");
+            } else {
+                tracing::info!("🔍 Starting missed games catchup process...");
+            }
+
+
+            // Run the missed games recovery
+            let client_arc = std::sync::Arc::new(client);
+            match satoshi_dice::recovery::process_missed_payouts(
+                client_arc,
+                &pool,
+                dry_run,
+            )
+                .await
+            {
+                Ok(()) => {
+                    if dry_run {
+                        tracing::info!("✅ Missed games catchup dry run completed successfully");
+                    } else {
+                        tracing::info!("✅ Missed games catchup completed successfully");
+                    }
+                }
+                Err(e) => {
+                    tracing::error!("❌ Missed games catchup failed: {:#}", e);
+                    return Err(e);
+                }
+            }
+        }
+
         Commands::CatchupMissedGames { dry_run } => {
             if dry_run {
                 tracing::info!("🔍 Starting missed games catchup process (DRY RUN - no changes will be made)...");

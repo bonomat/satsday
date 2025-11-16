@@ -46,6 +46,8 @@ settle:
 
 address:
     cargo run -- --config {{ CONFIG_FILE }} address
+boarding-address:
+    cargo run -- --config {{ CONFIG_FILE }} boarding-address
 
 game-addresses:
     cargo run -- --config {{ CONFIG_FILE }} game-addresses
@@ -62,5 +64,8 @@ run-frontend:
     cd frontend/satsday
     TRANSACTION_CHECK_INTERVAL_SECONDS=3 VITE_MAX_PAYOUT_SATS=100000 VITE_API_BASE_URL=http://localhost:12345 pnpm run dev
 
-catchup *args="--dry-run":
+catchup-missed-payouts *args="--dry-run":
+    cargo run -- --config {{ CONFIG_FILE }} catchup-missed-payouts {{ args }}
+
+catchup-missed-games *args="--dry-run":
     cargo run -- --config {{ CONFIG_FILE }} catchup-missed-games {{ args }}
