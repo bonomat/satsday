@@ -287,7 +287,9 @@ pub async fn unregister_telegram_chat(
     Ok(())
 }
 
-pub async fn get_registered_telegram_chats(pool: &Pool<Sqlite>) -> Result<Vec<String>, sqlx::Error> {
+pub async fn get_registered_telegram_chats(
+    pool: &Pool<Sqlite>,
+) -> Result<Vec<String>, sqlx::Error> {
     let records = sqlx::query!(
         r#"
         SELECT chat_id
@@ -411,7 +413,9 @@ pub async fn get_database_stats(pool: &Pool<Sqlite>) -> Result<DatabaseStats, sq
     })
 }
 
-pub async fn get_stats_by_multiplier(pool: &Pool<Sqlite>) -> Result<Vec<MultiplierStats>, sqlx::Error> {
+pub async fn get_stats_by_multiplier(
+    pool: &Pool<Sqlite>,
+) -> Result<Vec<MultiplierStats>, sqlx::Error> {
     let stats = sqlx::query!(
         r#"
         SELECT
@@ -430,12 +434,15 @@ pub async fn get_stats_by_multiplier(pool: &Pool<Sqlite>) -> Result<Vec<Multipli
     .fetch_all(pool)
     .await?;
 
-    Ok(stats.into_iter().map(|s| MultiplierStats {
-        multiplier: s.multiplier,
-        total_games: s.total_games,
-        total_winners: s.total_winners,
-        total_losers: s.total_losers,
-        total_bet_amount: s.total_bet,
-        total_payout_amount: s.total_payout,
-    }).collect())
+    Ok(stats
+        .into_iter()
+        .map(|s| MultiplierStats {
+            multiplier: s.multiplier,
+            total_games: s.total_games,
+            total_winners: s.total_winners,
+            total_losers: s.total_losers,
+            total_bet_amount: s.total_bet,
+            total_payout_amount: s.total_payout,
+        })
+        .collect())
 }

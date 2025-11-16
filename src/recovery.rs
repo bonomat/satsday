@@ -2,8 +2,10 @@ use crate::db;
 use crate::games::get_game;
 use crate::nonce_service::NonceService;
 use crate::ArkClient;
-use anyhow::{Context, Result};
-use bitcoin::{Amount, OutPoint};
+use anyhow::Context;
+use anyhow::Result;
+use bitcoin::Amount;
+use bitcoin::OutPoint;
 use sqlx::Pool;
 use sqlx::Sqlite;
 use std::sync::Arc;
@@ -14,7 +16,6 @@ pub async fn process_missed_payouts(
     pool: &Pool<Sqlite>,
     dry_run: bool,
 ) -> Result<()> {
-
     let mut successful_payouts = 0;
     let mut failed_payouts = 0;
     let mut total_payout_amount = 0u64;
@@ -49,7 +50,11 @@ pub async fn process_missed_payouts(
                 let player_address = match ark_core::ArkAddress::decode(&winner.player_address) {
                     Ok(addr) => addr,
                     Err(e) => {
-                        tracing::error!("Failed to decode player address {}: {}", winner.player_address, e);
+                        tracing::error!(
+                            "Failed to decode player address {}: {}",
+                            winner.player_address,
+                            e
+                        );
                         failed_payouts += 1;
                         continue;
                     }
@@ -79,14 +84,15 @@ pub async fn process_missed_payouts(
 
                             // Store as our own transaction
                             if let Err(e) =
-                                db::insert_own_transaction(pool, &output_txid, "retry_payout")
-                                    .await
+                                db::insert_own_transaction(pool, &output_txid, "retry_payout").await
                             {
                                 tracing::error!("Failed to store own transaction: {}", e);
                             }
 
                             // Mark as paid in database
-                            if let Err(e) = db::mark_payment_successful(pool, winner.id, &output_txid).await {
+                            if let Err(e) =
+                                db::mark_payment_successful(pool, winner.id, &output_txid).await
+                            {
                                 tracing::error!("Failed to mark payment as successful: {}", e);
                             }
 
@@ -125,15 +131,12 @@ pub async fn process_missed_payouts(
 
     if failed_payouts > 0 {
         tracing::error!(
-                "⚠️  Recovery completed: {} retry payouts sent, {} FAILED",
-                successful_payouts - failed_payouts,
-                failed_payouts
-            );
-        Err(anyhow::anyhow!(
-                "{} retry payouts failed",
-                failed_payouts
-            ))
-    } else if retry_payouts > 0  {
+            "⚠️  Recovery completed: {} retry payouts sent, {} FAILED",
+            successful_payouts - failed_payouts,
+            failed_payouts
+        );
+        Err(anyhow::anyhow!("{} retry payouts failed", failed_payouts))
+    } else if retry_payouts > 0 {
         let new_winners = successful_payouts - retry_payouts;
         tracing::info!(
                 "✅ Recovery completed: {} retry payouts sent + {} new winners recorded in DB (total {} sats pending payout)",
@@ -143,10 +146,11 @@ pub async fn process_missed_payouts(
             );
         Ok(())
     } else {
-        tracing::info!("✅ No unpaid winners or missed games found - all transactions are up to date");
+        tracing::info!(
+            "✅ No unpaid winners or missed games found - all transactions are up to date"
+        );
         Ok(())
     }
-
 }
 /// 1. Fetching all VTXOs for game addresses from the Ark server
 /// 2. Checking which ones are not in our database
@@ -159,7 +163,9 @@ pub async fn process_missed_games(
     dry_run: bool,
 ) -> Result<()> {
     if dry_run {
-        tracing::info!("🔍 Checking for missed games by scanning all game address VTXOs (DRY RUN)...");
+        tracing::info!(
+            "🔍 Checking for missed games by scanning all game address VTXOs (DRY RUN)..."
+        );
     } else {
         tracing::info!("🔍 Checking for missed games by scanning all game address VTXOs...");
     }
@@ -180,7 +186,10 @@ pub async fn process_missed_games(
         .await
         .context("Failed to fetch VTXOs from Ark server")?;
 
-    tracing::info!("Found {} total VTXOs across all game addresses", vtxos.len());
+    tracing::info!(
+        "Found {} total VTXOs across all game addresses",
+        vtxos.len()
+    );
 
     let mut new_games = 0;
     let mut already_processed = 0;
@@ -242,7 +251,10 @@ pub async fn process_missed_games(
         let ark_addresses = ark_client.get_parent_vtxo(out_point).await?;
         let own_address = ark_client.get_address();
 
-        let sender_address = match ark_addresses.into_iter().find(|addr| addr.encode() != own_address.encode()) {
+        let sender_address = match ark_addresses
+            .into_iter()
+            .find(|addr| addr.encode() != own_address.encode())
+        {
             Some(addr) => addr,
             None => {
                 tracing::debug!("No external sender found (likely our own transaction), skipping");
@@ -300,7 +312,9 @@ pub async fn process_missed_games(
 
         let (is_win, payout_amount) = if evaluation.is_win {
             let payout = (input_amount as f64
-                * evaluation.payout_multiplier.expect("to have payout multiplier")) as u64;
+                * evaluation
+                    .payout_multiplier
+                    .expect("to have payout multiplier")) as u64;
             (true, Some(payout))
         } else {
             (false, None)
@@ -340,7 +354,7 @@ pub async fn process_missed_games(
                     input_amount as i64,
                     payout_amount.map(|p| p as i64),
                     &sender_address.encode(),
-                    true, // is_winner
+                    true,  // is_winner
                     false, // payment_successful = false (will be paid later)
                     multiplier.multiplier() as i64,
                 )
@@ -430,10 +444,7 @@ pub async fn process_missed_games(
                 successful_payouts - (new_games - failed_payouts),
                 failed_payouts
             );
-            Err(anyhow::anyhow!(
-                "{} retry payouts failed",
-                failed_payouts
-            ))
+            Err(anyhow::anyhow!("{} retry payouts failed", failed_payouts))
         } else if retry_payouts > 0 || new_games > 0 {
             let new_winners = successful_payouts - retry_payouts;
             tracing::info!(
@@ -444,7 +455,9 @@ pub async fn process_missed_games(
             );
             Ok(())
         } else {
-            tracing::info!("✅ No unpaid winners or missed games found - all transactions are up to date");
+            tracing::info!(
+                "✅ No unpaid winners or missed games found - all transactions are up to date"
+            );
             Ok(())
         }
     }

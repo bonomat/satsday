@@ -236,7 +236,6 @@ impl ArkClient {
         Ok(spendable_vtxos)
     }
 
-
     async fn _spendable_vtxos(
         &self,
         vtxo: Vtxo,
@@ -250,7 +249,10 @@ impl ArkClient {
             vtxo_outpoints.spendable_with_recoverable()
         } else {
             let spendables = vtxo_outpoints.spendable().to_vec();
-            spendables.into_iter().filter(|u|!u.is_recoverable()).collect::<Vec<_>>()
+            spendables
+                .into_iter()
+                .filter(|u| !u.is_recoverable())
+                .collect::<Vec<_>>()
         };
 
         Ok((vtxo, spendable))
@@ -379,7 +381,8 @@ impl ArkClient {
                 }
             }
 
-            let mut interval = tokio::time::interval(tokio::time::Duration::from_secs(sync_interval_seconds));
+            let mut interval =
+                tokio::time::interval(tokio::time::Duration::from_secs(sync_interval_seconds));
             interval.set_missed_tick_behavior(tokio::time::MissedTickBehavior::Skip);
 
             tracing::info!(

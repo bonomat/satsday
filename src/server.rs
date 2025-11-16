@@ -135,7 +135,6 @@ pub async fn start_server_with_arc(
     pool: Pool<Sqlite>,
     config: Config,
 ) -> Result<()> {
-
     // Get our addresses for transaction monitoring
     let my_addresses = vec![ark_client_arc.get_address()];
 
@@ -169,7 +168,8 @@ pub async fn start_server_with_arc(
         let bot_token = token.clone();
         let bot_secret = secret.clone();
         tokio::spawn(async move {
-            if let Err(e) = crate::telegram::run_telegram_bot(bot_pool, bot_token, bot_secret).await {
+            if let Err(e) = crate::telegram::run_telegram_bot(bot_pool, bot_token, bot_secret).await
+            {
                 tracing::error!("❌ Telegram bot error: {:#}", e);
             }
         });
@@ -193,7 +193,9 @@ pub async fn start_server_with_arc(
     tracing::info!("🔍 Transaction monitoring started with subscriptions");
 
     // Start VTXO sync background task
-    let _vtxo_sync_handle = ark_client_arc.clone().spawn_vtxo_sync_task(config.vtxo_sync_interval_seconds);
+    let _vtxo_sync_handle = ark_client_arc
+        .clone()
+        .spawn_vtxo_sync_task(config.vtxo_sync_interval_seconds);
     tracing::info!(
         interval_seconds = config.vtxo_sync_interval_seconds,
         "🔄 VTXO sync background task started"
@@ -318,11 +320,10 @@ async fn get_games(
 
     for game in games {
         use crate::key_derivation::Multiplier;
-        let multiplier = Multiplier::from_value(game.multiplier as u64)
-            .ok_or_else(|| {
-                tracing::error!("Unknown multiplier value in database: {}", game.multiplier);
-                StatusCode::INTERNAL_SERVER_ERROR
-            })?;
+        let multiplier = Multiplier::from_value(game.multiplier as u64).ok_or_else(|| {
+            tracing::error!("Unknown multiplier value in database: {}", game.multiplier);
+            StatusCode::INTERNAL_SERVER_ERROR
+        })?;
         let target_number = multiplier.get_lower_than() as i64;
 
         let revealable_nonce = state.nonce_service.get_revealable_nonce(&game.nonce).await;
@@ -451,15 +452,17 @@ async fn handle_websocket(socket: axum::extract::ws::WebSocket, state: AppState)
 
             for game in games {
                 use crate::key_derivation::Multiplier;
-                let multiplier = Multiplier::from_value(game.multiplier as u64)
-                    .ok_or_else(|| {
-                        tracing::error!("Unknown multiplier value in database: {}", game.multiplier);
-                    });
+                let multiplier = Multiplier::from_value(game.multiplier as u64).ok_or_else(|| {
+                    tracing::error!("Unknown multiplier value in database: {}", game.multiplier);
+                });
 
                 let multiplier = match multiplier {
                     Ok(m) => m,
                     Err(_) => {
-                        tracing::warn!("Skipping game with invalid multiplier: {}", game.multiplier);
+                        tracing::warn!(
+                            "Skipping game with invalid multiplier: {}",
+                            game.multiplier
+                        );
                         continue;
                     }
                 };

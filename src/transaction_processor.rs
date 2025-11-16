@@ -338,7 +338,9 @@ impl TransactionProcessor {
                 &donation.sender,
                 donation.input_amount,
                 &donation.outpoint.txid.to_string(),
-            ).await {
+            )
+            .await
+            {
                 tracing::error!("Failed to send telegram notification: {:#}", e);
             }
         }
@@ -511,7 +513,9 @@ impl TransactionProcessor {
                         winner.multiplier.get_lower_than(),
                         &winner.outpoint.txid.to_string(),
                         payout_tx,
-                    ).await {
+                    )
+                    .await
+                    {
                         tracing::error!("Failed to send telegram notification: {:#}", e);
                     }
                 }
@@ -581,7 +585,9 @@ impl TransactionProcessor {
                     loser.rolled_number,
                     loser.multiplier.get_lower_than(),
                     &loser.outpoint.txid.to_string(),
-                ).await {
+                )
+                .await
+                {
                     tracing::error!("Failed to send telegram notification: {:#}", e);
                 }
             }

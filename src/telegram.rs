@@ -1,11 +1,15 @@
 use crate::db;
 use anyhow::Result;
 use rand::Rng;
-use sqlx::{Pool, Sqlite};
+use sqlx::Pool;
+use sqlx::Sqlite;
 use teloxide::prelude::*;
-use teloxide::types::{ChatId, ParseMode};
+use teloxide::types::ChatId;
+use teloxide::types::ParseMode;
 use teloxide::utils::command::BotCommands;
-use tracing::{error, info, warn};
+use tracing::error;
+use tracing::info;
+use tracing::warn;
 
 /// Generate a random registration secret
 pub fn generate_registration_secret() -> String {
@@ -22,7 +26,10 @@ pub fn generate_registration_secret() -> String {
 }
 
 #[derive(BotCommands, Clone)]
-#[command(rename_rule = "lowercase", description = "Satoshi Dice notification bot")]
+#[command(
+    rename_rule = "lowercase",
+    description = "Satoshi Dice notification bot"
+)]
 enum Command {
     #[command(description = "Subscribe to game notifications (requires invite secret)")]
     Start(String),
@@ -184,8 +191,11 @@ async fn handle_status(bot: Bot, chat_id: ChatId, pool: Pool<Sqlite>) -> Respons
         }
         Err(e) => {
             error!("Failed to check status for chat {}: {}", chat_id, e);
-            bot.send_message(chat_id, "❌ Failed to check status. Please try again later.")
-                .await?;
+            bot.send_message(
+                chat_id,
+                "❌ Failed to check status. Please try again later.",
+            )
+            .await?;
         }
     }
 
@@ -225,7 +235,6 @@ pub async fn broadcast_message(pool: &Pool<Sqlite>, token: &str, message: &str) 
         chat_ids.len(),
         message
     );
-
 
     for chat_id_str in chat_ids {
         if let Ok(chat_id_i64) = chat_id_str.parse::<i64>() {

@@ -100,8 +100,10 @@ impl ArkClient {
             all_keys.push((game_address.vtxo.clone(), game_address.secret_key));
         }
 
-        let sign_fn = |_psbt: &mut psbt::Input, msg: secp256k1::Message, index: usize|
-                       -> Result<(schnorr::Signature, XOnlyPublicKey), ark_core::Error> {
+        let sign_fn = |_psbt: &mut psbt::Input,
+                       msg: secp256k1::Message,
+                       index: usize|
+         -> Result<(schnorr::Signature, XOnlyPublicKey), ark_core::Error> {
             let input = vtxo_inputs.get(index).expect("input");
             let kp = all_keys.iter().find_map(|(v, sk)| {
                 if input.script_pubkey() == v.script_pubkey() {
@@ -119,9 +121,8 @@ impl ArkClient {
             Ok((sig, pk))
         };
 
-
         for i in 0..checkpoint_txs.len() {
-            sign_ark_transaction(|a, b |sign_fn(a, b, i), &mut ark_tx, i)?;
+            sign_ark_transaction(|a, b| sign_fn(a, b, i), &mut ark_tx, i)?;
         }
 
         let ark_txid = ark_tx.unsigned_tx.compute_txid();
@@ -133,7 +134,7 @@ impl ArkClient {
             .context("failed to submit offchain transaction request")?;
 
         for checkpoint_psbt in res.signed_checkpoint_txs.iter_mut() {
-            sign_checkpoint_transaction(|a, b|sign_fn(a, b, 0), checkpoint_psbt)?;
+            sign_checkpoint_transaction(|a, b| sign_fn(a, b, 0), checkpoint_psbt)?;
         }
 
         self.grpc_client

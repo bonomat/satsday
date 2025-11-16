@@ -39,11 +39,19 @@ enum Commands {
     },
     Settle,
     CatchupMissedPayouts {
-        #[arg(short, long, help = "Dry run - show what would be paid without sending payments")]
+        #[arg(
+            short,
+            long,
+            help = "Dry run - show what would be paid without sending payments"
+        )]
         dry_run: bool,
     },
     CatchupMissedGames {
-        #[arg(short, long, help = "Dry run - show what would be paid without modifying DB")]
+        #[arg(
+            short,
+            long,
+            help = "Dry run - show what would be paid without modifying DB"
+        )]
         dry_run: bool,
     },
 }
@@ -157,7 +165,7 @@ async fn main() -> Result<()> {
                     .filter(|vtxo| vtxo.script == ark_address.to_p2tr_script_pubkey())
                     .collect::<Vec<_>>();
                 let total_received: bitcoin::Amount = per_address.iter().map(|v| v.amount).sum();
-                all_received  += total_received;
+                all_received += total_received;
                 tracing::info!(
                     number_of_games = per_address.len(),
                     total_received = %total_received,
@@ -189,10 +197,7 @@ async fn main() -> Result<()> {
                 0.0
             };
 
-            tracing::info!(
-                win_rate = format!("{:.2}%", win_rate),
-                "📈 Win rate"
-            );
+            tracing::info!(win_rate = format!("{:.2}%", win_rate), "📈 Win rate");
 
             tracing::info!(
                 total_bet = %bitcoin::Amount::from_sat(db_stats.total_bet_amount as u64),
@@ -245,16 +250,9 @@ async fn main() -> Result<()> {
                 tracing::info!("🔍 Starting missed games catchup process...");
             }
 
-
             // Run the missed games recovery
             let client_arc = std::sync::Arc::new(client);
-            match satoshi_dice::recovery::process_missed_payouts(
-                client_arc,
-                &pool,
-                dry_run,
-            )
-                .await
-            {
+            match satoshi_dice::recovery::process_missed_payouts(client_arc, &pool, dry_run).await {
                 Ok(()) => {
                     if dry_run {
                         tracing::info!("✅ Missed games catchup dry run completed successfully");
@@ -277,7 +275,8 @@ async fn main() -> Result<()> {
             }
 
             // Create nonce service
-            let nonce_service = satoshi_dice::nonce_service::spawn_nonce_service(pool.clone(), 1, 1).await;
+            let nonce_service =
+                satoshi_dice::nonce_service::spawn_nonce_service(pool.clone(), 1, 1).await;
 
             // Run the missed games recovery
             let client_arc = std::sync::Arc::new(client);
