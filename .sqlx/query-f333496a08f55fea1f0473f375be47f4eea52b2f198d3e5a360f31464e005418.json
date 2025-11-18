@@ -1,0 +1,26 @@
+{
+  "db_name": "SQLite",
+  "query": "\n        SELECT\n            COALESCE(SUM(bet_amount), 0) as total_bet,\n            COALESCE(SUM(CASE WHEN winning_amount IS NOT NULL THEN winning_amount ELSE 0 END), 0) as total_payout\n        FROM game_results\n        WHERE rolled_number != -1\n        ",
+  "describe": {
+    "columns": [
+      {
+        "name": "total_bet",
+        "ordinal": 0,
+        "type_info": "Integer"
+      },
+      {
+        "name": "total_payout",
+        "ordinal": 1,
+        "type_info": "Integer"
+      }
+    ],
+    "parameters": {
+      "Right": 0
+    },
+    "nullable": [
+      false,
+      false
+    ]
+  },
+  "hash": "f333496a08f55fea1f0473f375be47f4eea52b2f198d3e5a360f31464e005418"
+}

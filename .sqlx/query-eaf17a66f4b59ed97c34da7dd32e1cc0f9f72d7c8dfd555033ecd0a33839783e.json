@@ -1,0 +1,50 @@
+{
+  "db_name": "SQLite",
+  "query": "\n        SELECT\n            multiplier,\n            COUNT(*) as total_games,\n            SUM(CASE WHEN is_winner = TRUE THEN 1 ELSE 0 END) as total_winners,\n            SUM(CASE WHEN is_winner = FALSE THEN 1 ELSE 0 END) as total_losers,\n            SUM(bet_amount) as total_bet,\n            COALESCE(SUM(CASE WHEN winning_amount IS NOT NULL THEN winning_amount ELSE 0 END), 0) as total_payout\n        FROM game_results\n        WHERE rolled_number != -1\n        GROUP BY multiplier\n        ORDER BY multiplier ASC\n        ",
+  "describe": {
+    "columns": [
+      {
+        "name": "multiplier",
+        "ordinal": 0,
+        "type_info": "Integer"
+      },
+      {
+        "name": "total_games",
+        "ordinal": 1,
+        "type_info": "Integer"
+      },
+      {
+        "name": "total_winners",
+        "ordinal": 2,
+        "type_info": "Integer"
+      },
+      {
+        "name": "total_losers",
+        "ordinal": 3,
+        "type_info": "Integer"
+      },
+      {
+        "name": "total_bet",
+        "ordinal": 4,
+        "type_info": "Integer"
+      },
+      {
+        "name": "total_payout",
+        "ordinal": 5,
+        "type_info": "Integer"
+      }
+    ],
+    "parameters": {
+      "Right": 0
+    },
+    "nullable": [
+      false,
+      false,
+      false,
+      false,
+      false,
+      false
+    ]
+  },
+  "hash": "eaf17a66f4b59ed97c34da7dd32e1cc0f9f72d7c8dfd555033ecd0a33839783e"
+}
