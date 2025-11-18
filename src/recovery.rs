@@ -15,13 +15,17 @@ pub async fn process_missed_payouts(
     ark_client: Arc<ArkClient>,
     pool: &Pool<Sqlite>,
     dry_run: bool,
+    hours: Option<u64>,
 ) -> Result<()> {
     let mut successful_payouts = 0;
     let mut failed_payouts = 0;
     let mut total_payout_amount = 0u64;
     let mut retry_payouts = 0;
 
-    let unpaid_winners = db::get_unpaid_winners(pool).await?;
+    let unpaid_winners = match hours {
+        Some(h) => db::get_unpaid_winners_within_hours(pool, h).await?,
+        None => db::get_unpaid_winners(pool).await?,
+    };
     if !unpaid_winners.is_empty() {
         tracing::info!("Found {} unpaid winners to process", unpaid_winners.len());
 

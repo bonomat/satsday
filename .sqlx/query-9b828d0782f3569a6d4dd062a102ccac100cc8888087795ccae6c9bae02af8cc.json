@@ -1,0 +1,86 @@
+{
+  "db_name": "SQLite",
+  "query": "\n        SELECT id, nonce, rolled_number, input_tx_id, output_tx_id,\n               bet_amount, winning_amount, player_address, is_winner,\n               payment_successful, timestamp, multiplier\n        FROM game_results\n        WHERE is_winner = TRUE\n          AND payment_successful = FALSE\n          AND timestamp >= datetime('now', '-' || ? || ' hours')\n        ORDER BY timestamp ASC\n        ",
+  "describe": {
+    "columns": [
+      {
+        "name": "id",
+        "ordinal": 0,
+        "type_info": "Integer"
+      },
+      {
+        "name": "nonce",
+        "ordinal": 1,
+        "type_info": "Text"
+      },
+      {
+        "name": "rolled_number",
+        "ordinal": 2,
+        "type_info": "Integer"
+      },
+      {
+        "name": "input_tx_id",
+        "ordinal": 3,
+        "type_info": "Text"
+      },
+      {
+        "name": "output_tx_id",
+        "ordinal": 4,
+        "type_info": "Text"
+      },
+      {
+        "name": "bet_amount",
+        "ordinal": 5,
+        "type_info": "Integer"
+      },
+      {
+        "name": "winning_amount",
+        "ordinal": 6,
+        "type_info": "Integer"
+      },
+      {
+        "name": "player_address",
+        "ordinal": 7,
+        "type_info": "Text"
+      },
+      {
+        "name": "is_winner",
+        "ordinal": 8,
+        "type_info": "Bool"
+      },
+      {
+        "name": "payment_successful",
+        "ordinal": 9,
+        "type_info": "Bool"
+      },
+      {
+        "name": "timestamp",
+        "ordinal": 10,
+        "type_info": "Datetime"
+      },
+      {
+        "name": "multiplier",
+        "ordinal": 11,
+        "type_info": "Integer"
+      }
+    ],
+    "parameters": {
+      "Right": 1
+    },
+    "nullable": [
+      false,
+      false,
+      false,
+      false,
+      true,
+      false,
+      true,
+      false,
+      false,
+      false,
+      false,
+      false
+    ]
+  },
+  "hash": "9b828d0782f3569a6d4dd062a102ccac100cc8888087795ccae6c9bae02af8cc"
+}

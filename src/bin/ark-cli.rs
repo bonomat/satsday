@@ -45,6 +45,11 @@ enum Commands {
             help = "Dry run - show what would be paid without sending payments"
         )]
         dry_run: bool,
+        #[arg(
+            long,
+            help = "Only process games from the last N hours (e.g., 24 for last 24 hours). If not specified, all unpaid games are processed."
+        )]
+        hours: Option<u64>,
     },
     CatchupMissedGames {
         #[arg(
@@ -243,16 +248,24 @@ async fn main() -> Result<()> {
                 );
             }
         }
-        Commands::CatchupMissedPayouts { dry_run } => {
+        Commands::CatchupMissedPayouts { dry_run, hours } => {
             if dry_run {
-                tracing::info!("🔍 Starting missed games catchup process (DRY RUN - no changes will be made)...");
+                if let Some(h) = hours {
+                    tracing::info!("🔍 Starting missed games catchup process for last {} hours (DRY RUN - no changes will be made)...", h);
+                } else {
+                    tracing::info!("🔍 Starting missed games catchup process (DRY RUN - no changes will be made)...");
+                }
             } else {
-                tracing::info!("🔍 Starting missed games catchup process...");
+                if let Some(h) = hours {
+                    tracing::info!("🔍 Starting missed games catchup process for last {} hours...", h);
+                } else {
+                    tracing::info!("🔍 Starting missed games catchup process...");
+                }
             }
 
             // Run the missed games recovery
             let client_arc = std::sync::Arc::new(client);
-            match satoshi_dice::recovery::process_missed_payouts(client_arc, &pool, dry_run).await {
+            match satoshi_dice::recovery::process_missed_payouts(client_arc, &pool, dry_run, hours).await {
                 Ok(()) => {
                     if dry_run {
                         tracing::info!("✅ Missed games catchup dry run completed successfully");

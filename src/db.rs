@@ -236,6 +236,31 @@ pub async fn get_unpaid_winners(pool: &Pool<Sqlite>) -> Result<Vec<GameResult>, 
     Ok(results)
 }
 
+pub async fn get_unpaid_winners_within_hours(
+    pool: &Pool<Sqlite>,
+    hours: u64,
+) -> Result<Vec<GameResult>, sqlx::Error> {
+    let hours = hours as i64;
+    let results = sqlx::query_as!(
+        GameResult,
+        r#"
+        SELECT id, nonce, rolled_number, input_tx_id, output_tx_id,
+               bet_amount, winning_amount, player_address, is_winner,
+               payment_successful, timestamp, multiplier
+        FROM game_results
+        WHERE is_winner = TRUE
+          AND payment_successful = FALSE
+          AND timestamp >= datetime('now', '-' || ? || ' hours')
+        ORDER BY timestamp ASC
+        "#,
+        hours
+    )
+    .fetch_all(pool)
+    .await?;
+
+    Ok(results)
+}
+
 pub async fn mark_payment_successful(
     pool: &Pool<Sqlite>,
     game_id: i64,
