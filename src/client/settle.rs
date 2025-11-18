@@ -770,7 +770,6 @@ impl ArkClient {
                             vtxo.clone(),
                             virtual_tx_outpoint.amount,
                             virtual_tx_outpoint.outpoint,
-                            virtual_tx_outpoint.is_recoverable(),
                         )
                     })
                     .collect::<Vec<_>>()

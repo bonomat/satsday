@@ -90,13 +90,13 @@ async fn main() -> Result<()> {
                 );
             }
 
-            let balance = client.get_balance().await?;
+            let balance = client.get_balance(true).await?;
             tracing::info!("💰 Balance: {:?}", balance);
 
             satoshi_dice::server::start_server(client, port, pool, config).await?;
         }
         Commands::Balance => {
-            let balance = client.get_balance().await?;
+            let balance = client.get_balance(true).await?;
             tracing::info!(
                 "Offchain balance: spendable = {}, expired = {}",
                 balance.offchain_spendable,

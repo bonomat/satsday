@@ -147,7 +147,7 @@ impl ArkClient {
         self.boarding_output.address().clone()
     }
 
-    pub async fn get_balance(&self) -> Result<Balance> {
+    pub async fn get_balance(&self, recoverable: bool) -> Result<Balance> {
         let runtime = tokio::runtime::Handle::current();
         let find_outpoints_fn =
             |address: &bitcoin::Address| -> Result<Vec<ark_core::ExplorerUtxo>, ark_core::Error> {
@@ -164,7 +164,7 @@ impl ArkClient {
             };
 
         let virtual_tx_outpoints = {
-            let spendable_vtxos = self.spendable_vtxos(false).await?;
+            let spendable_vtxos = self.spendable_vtxos(recoverable).await?;
             list_virtual_tx_outpoints(find_outpoints_fn, spendable_vtxos)?
         };
 

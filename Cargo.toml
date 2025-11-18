@@ -9,8 +9,8 @@ path = "src/bin/ark-cli.rs"
 
 [dependencies]
 anyhow = "1"
-ark-core = { git = "https://github.com/arkade-os/rust-sdk.git", rev = "8640e79278b235398964ab0dfd0f7b1fc37b9fd5" }
-ark-grpc = { git = "https://github.com/arkade-os/rust-sdk.git", rev = "8640e79278b235398964ab0dfd0f7b1fc37b9fd5" }
+ark-core = { git = "https://github.com/arkade-os/rust-sdk.git", rev = "37aa6852a566b1741c0460f3fc09643b7b957d8e" }
+ark-grpc = { git = "https://github.com/arkade-os/rust-sdk.git", rev = "37aa6852a566b1741c0460f3fc09643b7b957d8e" }
 async-stream = "0.3"
 atty = "0.2.14"
 axum = { version = "0.8", features = ["ws"] }

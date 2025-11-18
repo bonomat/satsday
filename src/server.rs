@@ -417,7 +417,7 @@ async fn get_version() -> Result<Json<Value>, StatusCode> {
 async fn get_balance(State(state): State<AppState>) -> Result<Json<Value>, StatusCode> {
     let balance = state
         .ark_client
-        .get_balance()
+        .get_balance(false)
         .await
         .map_err(|_| StatusCode::INTERNAL_SERVER_ERROR)?;
 
